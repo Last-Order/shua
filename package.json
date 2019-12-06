@@ -1,0 +1,30 @@
+{
+  "name": "shua",
+  "version": "1.0.0",
+  "description": "A lovely downloader",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc --newLine lf"
+  },
+  "bin": {
+    "shua": "./dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Last-Order/shua.git"
+  },
+  "author": "Eridanus Sora",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Last-Order/shua/issues"
+  },
+  "homepage": "https://github.com/Last-Order/shua#readme",
+  "dependencies": {
+    "axios": "^0.19.0",
+    "erii": "^1.2.6",
+    "socks-proxy-agent": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^12.12.14"
+  }
+}
