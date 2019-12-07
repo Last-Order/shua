@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 import Erii from 'erii';
 import Downloader from './core/downloader';
+import { deleteDirectory } from './utils/system';
 
 Erii.setMetaInfo({
     version: JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json')).toString())['version'],
@@ -36,13 +37,49 @@ Erii.bind({
 
 Erii.addOption({
     name: 'headers',
-    description: 'Custom HTTP Headers',
+    description: 'Custom HTTP headers',
+    argument: {
+        name: 'headers',
+        description: '(Optional) Custom HTTP headers. Multi headers should be splitted with "\\n\"',
+    }
 });
 
 Erii.addOption({
-    name: 'output',
-    description: 'Set output direcotry'
+    name: 'threads',
+    description: 'Threads limit',
+    argument: {
+        name: 'limit',
+        description: '(Optional) Limit of threads, defaults to 8'
+    }
+})
+
+Erii.addOption({
+    name: ['output', 'o'],
+    description: 'Set output direcotry',
+    argument: {
+        name: 'path',
+        description: '(Optional) Output files path.',
+        validate: (outputPath: string, logger) => {
+            if (path.basename(outputPath).match(/[\*\:|\?<>]/)) {
+                logger('Filename should\'t contain :, |, <, >.');
+                return false;
+            }
+            return true;
+        }
+    }
 });
+
+Erii.bind({
+    name: ['clean'],
+    description: 'Clean cache files',
+}, () => {
+    for (const file of fs.readdirSync(path.resolve(__dirname, '../'))) {
+        if (file.startsWith('shua_download_')) {
+            deleteDirectory(path.resolve(__dirname, `../${file}`));
+        }
+    }
+    fs.writeFileSync(path.resolve(__dirname, '../tasks.json'), '[]');
+})
 
 Erii.default(() => {
     Erii.showHelp();

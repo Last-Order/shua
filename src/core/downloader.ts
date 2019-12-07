@@ -1,8 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { EventEmitter } from 'events';
-import { downloadFile } from '../utils/file'; 
 import { URL } from 'url';
+import { EventEmitter } from 'events';
+import { downloadFile } from '../utils/file';
+import Logger from '../utils/logger';
+
 export interface DownloaderOptions {
     /** 并发数量 */
     threads: number;
@@ -27,6 +29,9 @@ class Downloader extends EventEmitter {
     headers: object = {};
     output: string = './shua_download_' + new Date().valueOf().toString();
 
+    // Deps
+    logger: Logger;
+
     // Runtime Status
     /** 当前运行并发数量 */
     nowRunningThreadsCount: number = 0;
@@ -47,6 +52,7 @@ class Downloader extends EventEmitter {
 
     constructor({ threads, headers, output }: DownloaderOptions) {
         super();
+        this.logger = new Logger();
         if (threads) {
             this.threads = threads;
         }
@@ -91,6 +97,23 @@ class Downloader extends EventEmitter {
         this.startTime = new Date();
         this.unfinishedTasks = [...this.tasks];
         this.totalCount = this.tasks.length;
+
+        if (process.platform === "win32") {
+            const rl = require("readline").createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+
+            rl.on("SIGINT", function () {
+                // @ts-ignore
+                process.emit("SIGINT");
+            });
+        }
+
+        process.on("SIGINT", () => {
+            process.exit();
+        });
+
         this.checkQueue();
     }
 
@@ -109,10 +132,9 @@ class Downloader extends EventEmitter {
                     await this.handleTask(task);
                     this.nowRunningThreadsCount--;
                     this.finishCount++;
-                    console.log(`${this.finishCount} / ${this.totalCount}`);
+                    this.logger.info(`${this.finishCount} / ${this.totalCount} or ${(this.finishCount / this.totalCount * 100).toFixed(2)}% finished | ETA: ${this.getETA()}`);
                 } catch (e) {
-                    console.log(e.message);
-                    console.log(`Download ${task.url} failed, retry later.`);
+                    this.logger.warning(`Download ${task.url} failed, retry later.`);
                     this.unfinishedTasks.push(task);
                     this.nowRunningThreadsCount--;
                 } finally {
@@ -123,7 +145,7 @@ class Downloader extends EventEmitter {
             }
         }
         if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
-            console.log('Finished');
+            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
             process.exit();
         }
     }
@@ -131,7 +153,21 @@ class Downloader extends EventEmitter {
     async handleTask(task: DownloadTask) {
         const filename = new URL(task.url).pathname.slice(1);
         const p = filename.split('/');
-        return await downloadFile(task.url, path.resolve(this.output, p[p.length - 1]));
+        return await downloadFile(task.url, path.resolve(this.output, p[p.length - 1]), {
+            ...(Object.keys(this.headers).length > 0 ? this.headers : {})
+        });
+    }
+
+    getETA() {
+        const usedTime = new Date().valueOf() - this.startTime.valueOf();
+        const remainingTimeInSeconds = Math.round(((usedTime / this.finishCount * this.totalCount) - usedTime) / 1000)
+        if (remainingTimeInSeconds < 60) {
+            return `${remainingTimeInSeconds}s`;
+        } else if (remainingTimeInSeconds < 3600) {
+            return `${Math.floor(remainingTimeInSeconds / 60)}m ${remainingTimeInSeconds % 60}s`;
+        } else {
+            return `${Math.floor(remainingTimeInSeconds / 3600)}h ${Math.floor((remainingTimeInSeconds % 3600) / 60)}m ${remainingTimeInSeconds % 60}s`;
+        }
     }
 }
 
