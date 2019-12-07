@@ -35,6 +35,18 @@ Erii.bind({
     downloader.start();
 });
 
+Erii.bind({
+    name: ['clean'],
+    description: '[DEBUG ONLY DO NOT USE]',
+}, () => {
+    for (const file of fs.readdirSync(path.resolve(__dirname, '../'))) {
+        if (file.startsWith('shua_download_')) {
+            deleteDirectory(path.resolve(__dirname, `../${file}`));
+        }
+    }
+    fs.writeFileSync(path.resolve(__dirname, '../tasks.json'), '[]');
+});
+
 Erii.addOption({
     name: 'headers',
     description: 'Custom HTTP headers',
@@ -58,7 +70,7 @@ Erii.addOption({
     description: 'Set output direcotry',
     argument: {
         name: 'path',
-        description: '(Optional) Output files path.',
+        description: '(Optional) Output files path',
         validate: (outputPath: string, logger) => {
             if (path.basename(outputPath).match(/[\*\:|\?<>]/)) {
                 logger('Filename should\'t contain :, |, <, >.');
@@ -69,17 +81,10 @@ Erii.addOption({
     }
 });
 
-Erii.bind({
-    name: ['clean'],
-    description: 'Clean cache files',
-}, () => {
-    for (const file of fs.readdirSync(path.resolve(__dirname, '../'))) {
-        if (file.startsWith('shua_download_')) {
-            deleteDirectory(path.resolve(__dirname, `../${file}`));
-        }
-    }
-    fs.writeFileSync(path.resolve(__dirname, '../tasks.json'), '[]');
-})
+Erii.addOption({
+    name: ['ascending'],
+    description: 'Rename output files numerical ascendingly'
+});
 
 Erii.default(() => {
     Erii.showHelp();

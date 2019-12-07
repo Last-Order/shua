@@ -12,6 +12,8 @@ export interface DownloaderOptions {
     headers: string;
     /** 输出目录 */
     output: string;
+    /** 是否以数字增序重命名文件 */
+    ascending: boolean;
 }
 /**
  * 下载任务结构
@@ -21,6 +23,8 @@ export interface DownloadTask {
     url: string;
     /** 重试计数 */
     retryCount: number;
+    /** 输出文件名 */
+    filename?: string;
 }
 
 class Downloader extends EventEmitter {
@@ -28,6 +32,7 @@ class Downloader extends EventEmitter {
     threads: number = 8;
     headers: object = {};
     output: string = './shua_download_' + new Date().valueOf().toString();
+    ascending: boolean = false;
 
     // Deps
     logger: Logger;
@@ -50,7 +55,7 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output }: DownloaderOptions) {
+    constructor({ threads, headers, output, ascending }: DownloaderOptions) {
         super();
         this.logger = new Logger();
         if (threads) {
@@ -71,6 +76,9 @@ class Downloader extends EventEmitter {
             }
             this.output = output;
         }
+        if (ascending) {
+            this.ascending = ascending;
+        }
         if (!fs.existsSync(this.output)) {
             fs.mkdirSync(this.output);
         }
@@ -88,6 +96,17 @@ class Downloader extends EventEmitter {
                 retryCount: 0
             };
         }));
+        if (this.ascending) {
+            // 增序重命名文件
+            const maxLength = this.tasks.length.toString().length;
+            let counter = 0;
+            for (const task of this.tasks) {
+                const urlPath = new URL(task.url).pathname.slice(1).split('.');
+                const ext = urlPath[urlPath.length - 1];
+                task.filename = counter.toString().padStart(maxLength, '0') + `.${ext}`;
+                counter++;
+            }
+        }
     }
 
     /**
@@ -153,7 +172,7 @@ class Downloader extends EventEmitter {
     async handleTask(task: DownloadTask) {
         const filename = new URL(task.url).pathname.slice(1);
         const p = filename.split('/');
-        return await downloadFile(task.url, path.resolve(this.output, p[p.length - 1]), {
+        return await downloadFile(task.url, path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]), {
             ...(Object.keys(this.headers).length > 0 ? this.headers : {})
         });
     }
