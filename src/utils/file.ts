@@ -41,6 +41,9 @@ export function downloadFile(url, path, { proxy, timeout = 60000, headers }: Dow
                 },
                 cancelToken: source.token,
             });
+            if (parseInt(response.headers['content-length']) !== response.data.length) {
+                reject('Bad response');
+            }
             fs.writeFileSync(path, response.data);
             resolve();
         } catch (e) {
