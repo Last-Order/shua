@@ -8,6 +8,8 @@ import Logger from '../utils/logger';
 export interface DownloaderOptions {
     /** 并发数量 */
     threads: number;
+    /** 超时阈值 */
+    timeout: number;
     /** Custom HTTP Headers */
     headers: string;
     /** 输出目录 */
@@ -30,6 +32,7 @@ export interface DownloadTask {
 class Downloader extends EventEmitter {
     // Config
     threads: number = 8;
+    timeout: number = 30000;
     headers: object = {};
     output: string = './shua_download_' + new Date().valueOf().toString();
     ascending: boolean = false;
@@ -55,11 +58,14 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output, ascending }: DownloaderOptions) {
+    constructor({ threads, headers, output, ascending, timeout }: DownloaderOptions) {
         super();
         this.logger = new Logger();
         if (threads) {
             this.threads = threads;
+        }
+        if (timeout) {
+            this.timeout = timeout;
         }
         if (headers) {
             for (const h of headers.toString().split('\n')) {
@@ -173,7 +179,8 @@ class Downloader extends EventEmitter {
         const filename = new URL(task.url).pathname.slice(1);
         const p = filename.split('/');
         return await downloadFile(task.url, path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]), {
-            ...(Object.keys(this.headers).length > 0 ? this.headers : {})
+            ...(Object.keys(this.headers).length > 0 ? this.headers : {}),
+            timeout: this.timeout
         });
     }
 

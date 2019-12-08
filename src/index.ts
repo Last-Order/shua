@@ -63,7 +63,16 @@ Erii.addOption({
         name: 'limit',
         description: '(Optional) Limit of threads, defaults to 8'
     }
-})
+});
+
+Erii.addOption({
+    name: 'timeout',
+    description: 'Timeout threshold for each segment.',
+    argument: {
+        name: 'limit',
+        description: '(Optional) Timeout threshold in ms, defaults to 30000'
+    }
+});
 
 Erii.addOption({
     name: ['output', 'o'],
