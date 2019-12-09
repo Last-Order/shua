@@ -171,7 +171,7 @@ class Downloader extends EventEmitter {
         }
         if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
             this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
-            process.exit();
+            this.emit('finish');
         }
     }
 
