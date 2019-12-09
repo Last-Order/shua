@@ -33,7 +33,7 @@ Erii.bind({
     const downloader = new Downloader(options);
     downloader.loadUrlsFromFile(path);
     downloader.start();
-    downloader.on('finish', () => {
+    downloader.once('finish', () => {
         process.exit();
     });
 });

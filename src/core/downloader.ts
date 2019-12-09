@@ -150,7 +150,7 @@ class Downloader extends EventEmitter {
         if (this.isEnd) {
             return;
         }
-        if (this.nowRunningThreadsCount < this.threads) {
+        if (this.nowRunningThreadsCount < this.threads && this.unfinishedTasks.length > 0) {
             // 有空余的并发可供使用
             if (this.unfinishedTasks.length > 0) {
                 // 有剩余任务 执行
@@ -169,8 +169,6 @@ class Downloader extends EventEmitter {
                 } finally {
                     this.checkQueue();
                 }
-            } else {
-                // 无未完成的任务了
             }
         }
         if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
