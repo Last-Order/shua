@@ -48,6 +48,7 @@ class Downloader extends EventEmitter {
     /** 已完成任务数 */
     finishCount: number = 0;
     startTime: Date;
+    isEnd: boolean = false;
     /** 
      * 所有需要下载的任务
      * 开始后不修改
@@ -146,6 +147,9 @@ class Downloader extends EventEmitter {
      * 检查下载队列
      */
     async checkQueue() {
+        if (this.isEnd) {
+            return;
+        }
         if (this.nowRunningThreadsCount < this.threads) {
             // 有空余的并发可供使用
             if (this.unfinishedTasks.length > 0) {
@@ -170,6 +174,7 @@ class Downloader extends EventEmitter {
             }
         }
         if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
+            this.isEnd = true;
             this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
             this.emit('finish');
         }
