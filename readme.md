@@ -64,7 +64,7 @@ https://example.com/segment100.ts
 
 Just use the following command
 
-`shua -e "https://example.com/segment{{%d(1, 10)}}.ts"`
+`shua -e "https://example.com/segment{{%d(1, 100)}}.ts"`
 
 ## Example
 
