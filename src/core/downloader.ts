@@ -3,6 +3,7 @@ import * as path from 'path';
 import { URL } from 'url';
 import { EventEmitter } from 'events';
 import { downloadFile } from '../utils/file';
+import ExpressionParser from './expression_parser';
 import Logger from '../utils/logger';
 
 export interface DownloaderOptions {
@@ -103,6 +104,25 @@ class Downloader extends EventEmitter {
                 retryCount: 0
             };
         }));
+        this.checkAscending();
+    }
+
+    /**
+     * 从表达式添加任务
+     * @param expression 表达式
+     */
+    loadUrlsFromExpression(expression: string) {
+        const expressionParser = new ExpressionParser(expression);
+        this.tasks.push(...expressionParser.getUrls().map(url => {
+            return {
+                url,
+                retryCount: 0
+            }
+        }));
+        this.checkAscending();
+    }
+
+    checkAscending() {
         if (this.ascending) {
             // 增序重命名文件
             const maxLength = this.tasks.length.toString().length;

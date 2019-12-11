@@ -39,6 +39,19 @@ Erii.bind({
 });
 
 Erii.bind({
+    name: ['expression', 'e'],
+    description: 'Download urls from a expression',
+    argument: {
+        name: 'expression',
+        description: 'Url expression'
+    }
+}, (ctx, options) => {
+    const expression = ctx.getArgument().toString();
+    const downloader = new Downloader(options);
+    downloader.loadUrlsFromExpression(expression);
+});
+
+Erii.bind({
     name: ['clean'],
     description: '[DEBUG ONLY DO NOT USE]',
 }, () => {

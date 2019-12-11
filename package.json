@@ -1,6 +1,6 @@
 {
   "name": "shua",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A lovely downloader",
   "main": "index.js",
   "scripts": {
@@ -25,6 +25,7 @@
     "socks-proxy-agent": "^4.0.2"
   },
   "devDependencies": {
-    "@types/node": "^12.12.14"
+    "@types/node": "^12.12.14",
+    "typescript": "^3.7.3"
   }
 }
