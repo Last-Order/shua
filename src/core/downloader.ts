@@ -87,9 +87,6 @@ class Downloader extends EventEmitter {
         if (ascending) {
             this.ascending = ascending;
         }
-        if (!fs.existsSync(this.output)) {
-            fs.mkdirSync(this.output);
-        }
     }
 
     /**
@@ -159,6 +156,10 @@ class Downloader extends EventEmitter {
         process.on("SIGINT", () => {
             process.exit();
         });
+
+        if (!fs.existsSync(this.output)) {
+            fs.mkdirSync(this.output);
+        }
 
         this.checkQueue();
     }

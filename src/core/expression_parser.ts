@@ -7,7 +7,7 @@ class ExpressionParser {
     }
     private parse() {
         // Integer expression
-        const integerExpressionMatchResults = [...this.expression.matchAll(/({{%d.+?}})/)]
+        const integerExpressionMatchResults = [...this.expression.matchAll(/({{%d.+?}})/ig)];
         if (integerExpressionMatchResults.length > 0) {
             const firstIntegerExpressionMatchResult = integerExpressionMatchResults.shift();
             const integerExpressionArgumentMatchResult = firstIntegerExpressionMatchResult[1].match(/{{%d\((.+?)\)}}/);
@@ -16,6 +16,9 @@ class ExpressionParser {
             }
             const integerExpressionArguments = firstIntegerExpressionMatchResult[1].match(/{{%d\((.+?)\)}}/)[1].split(',').map(a => parseInt(a));
             if (integerExpressionArguments.length < 2 || integerExpressionArguments.length > 3 || integerExpressionArguments.some(a => isNaN(a))) {
+                console.error(`ERROR: Wrong arguments for integer expression`);
+                console.error(`${this.expression}`);
+                console.error(`${new Array(firstIntegerExpressionMatchResult.index).fill(' ').join('')}${new Array(firstIntegerExpressionMatchResult[1].length).fill('^').join('')}`)
                 throw new Error('Invalid integer expression: wrong arguments');
             }
             if (integerExpressionArguments[1] >= integerExpressionArguments[0]) {
@@ -34,6 +37,13 @@ class ExpressionParser {
                     this.expression.slice(0, firstIntegerExpressionMatchResult.index) + i.toString() + this.expression.slice(firstIntegerExpressionMatchResult.index + firstIntegerExpressionMatchResult[1].length)
                 );
             }
+        }
+        if (integerExpressionMatchResults.length > 0) {
+            const result = [];
+            for (const url of this.urls) {
+                result.push(...new ExpressionParser(url).getUrls());
+            }
+            this.urls = result;
         }
     }
     getUrls() {

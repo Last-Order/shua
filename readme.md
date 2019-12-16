@@ -66,6 +66,27 @@ Just use the following command
 
 `shua -e "https://example.com/segment{{%d(1, 100)}}.ts"`
 
+Multi expressions is also supported.
+
+To download
+
+```
+https://example.com/segment1_1.ts
+https://example.com/segment1_2.ts
+...
+https://example.com/segment1_10.ts
+https://example.com/segment2_1.ts
+https://example.com/segment2_2.ts
+...
+https://example.com/segment2_10.ts
+...
+https://example.com/segment5_10.ts
+```
+
+Use the following expression
+
+`shua -e "https://example.com/segment{{%d(1, 5)}}_{{%d(1, 10)}}.ts"`
+
 ## Example
 
 ### Download all urls from a.txt with 16 threads

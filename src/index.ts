@@ -49,6 +49,10 @@ Erii.bind({
     const expression = ctx.getArgument().toString();
     const downloader = new Downloader(options);
     downloader.loadUrlsFromExpression(expression);
+    downloader.start();
+    downloader.once('finish', () => {
+        process.exit();
+    });
 });
 
 Erii.bind({
