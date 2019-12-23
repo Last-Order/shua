@@ -50,7 +50,7 @@ Shua supports generating urls from a url expression.
 
 ### Integer Expressions
 
-Syntax: `{{%d(start, end, step?)}}`
+Syntax: `{{%d(start: integer, end: integer, step?: integer, leftPad?: integer)}}`
 
 For example, to download
 
@@ -86,6 +86,19 @@ https://example.com/segment5_10.ts
 Use the following expression
 
 `shua -e "https://example.com/segment{{%d(1, 5)}}_{{%d(1, 10)}}.ts"`
+
+To download
+```
+https://example.com/segment001.ts
+https://example.com/segment002.ts
+https://example.com/segment003.ts
+...
+https://example.com/segment100.ts
+```
+
+Use
+
+`shua -e "https://example.com/segment{{%d(1, 100, 1, 3)}}.ts"`
 
 ## Example
 

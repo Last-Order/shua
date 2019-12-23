@@ -15,7 +15,7 @@ class ExpressionParser {
                 throw new Error('Invalid integer expression');
             }
             const integerExpressionArguments = firstIntegerExpressionMatchResult[1].match(/{{%d\((.+?)\)}}/)[1].split(',').map(a => parseInt(a));
-            if (integerExpressionArguments.length < 2 || integerExpressionArguments.length > 3 || integerExpressionArguments.some(a => isNaN(a))) {
+            if (integerExpressionArguments.length < 2 || integerExpressionArguments.length > 4 || integerExpressionArguments.some(a => isNaN(a))) {
                 console.error(`ERROR: Wrong arguments for integer expression`);
                 console.error(`${this.expression}`);
                 console.error(`${new Array(firstIntegerExpressionMatchResult.index).fill(' ').join('')}${new Array(firstIntegerExpressionMatchResult[1].length).fill('^').join('')}`)
@@ -31,10 +31,10 @@ class ExpressionParser {
                     throw new Error('Invalid integer expression: infinite list');
                 }
             }
-            const [start, end, step = 1] = integerExpressionArguments;
+            const [start, end, step = 1, leftPad = 0] = integerExpressionArguments;
             for (let i = start; (step > 0 ? (i <= end) : (i >= end)); i += step) {
                 this.urls.push(
-                    this.expression.slice(0, firstIntegerExpressionMatchResult.index) + i.toString() + this.expression.slice(firstIntegerExpressionMatchResult.index + firstIntegerExpressionMatchResult[1].length)
+                    this.expression.slice(0, firstIntegerExpressionMatchResult.index) + i.toString().padStart(leftPad, '0') + this.expression.slice(firstIntegerExpressionMatchResult.index + firstIntegerExpressionMatchResult[1].length)
                 );
             }
         }
