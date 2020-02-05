@@ -1,12 +1,13 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "es5",
         "outDir": "dist",
         "declaration": true,
         "module": "commonjs",
         "sourceMap": true,
-        "lib": ["es7", "esnext"],
+        "lib": ["es6", "es7", "esnext"],
         "experimentalDecorators": true,
+        "downlevelIteration": true,
         "newLine": "LF"
     },
     "include": [
