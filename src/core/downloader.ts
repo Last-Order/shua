@@ -60,7 +60,7 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output, ascending, timeout }: DownloaderOptions) {
+    constructor({ threads, headers, output, ascending, timeout }: Partial<DownloaderOptions>) {
         super();
         this.logger = new Logger();
         if (threads) {
@@ -111,6 +111,20 @@ class Downloader extends EventEmitter {
     loadUrlsFromExpression(expression: string) {
         const expressionParser = new ExpressionParser(expression);
         this.tasks.push(...expressionParser.getUrls().map(url => {
+            return {
+                url,
+                retryCount: 0
+            }
+        }));
+        this.checkAscending();
+    }
+
+    /**
+     * 从URL数组添加任务
+     * @param urls URL数组
+     */
+    loadUrlsFromArray(urls: string[]) {
+        this.tasks.push(...urls.map(url => {
             return {
                 url,
                 retryCount: 0
