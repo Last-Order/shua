@@ -107,3 +107,16 @@ Use
 ```
 shua -f a.txt --threads 16
 ```
+
+## Use as a library
+
+```JavaScript
+import { Downloader } from 'shua';
+const downloader = new Downloader();
+downloader.addUrlsFromFile('urls.txt');
+downloader.on('downloaded', () => {
+   console.log('All files downloaded!');  
+});
+downloader.start();
+
+```
