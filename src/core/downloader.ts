@@ -139,9 +139,16 @@ class Downloader extends EventEmitter {
             const maxLength = this.tasks.length.toString().length;
             let counter = 0;
             for (const task of this.tasks) {
-                const urlPath = new URL(task.url).pathname.slice(1).split('.');
-                const ext = urlPath[urlPath.length - 1];
-                task.filename = counter.toString().padStart(maxLength, '0') + `.${ext}`;
+                const urlPath = new URL(task.url).pathname.slice(1).split('/');
+                let ext;
+                if (urlPath[urlPath.length - 1].includes('.')) {
+                    ext = urlPath[urlPath.length - 1].split('.').slice(-1)[0];
+                }
+                if (ext) {
+                    task.filename = counter.toString().padStart(maxLength, '0') + `.${ext}`;
+                } else {
+                    task.filename = counter.toString().padStart(maxLength, '0');
+                }
                 counter++;
             }
         }
