@@ -204,10 +204,13 @@ class Downloader extends EventEmitter {
                     this.nowRunningThreadsCount--;
                     this.finishCount++;
                     this.logger.info(`${this.finishCount} / ${this.totalCount} or ${(this.finishCount / this.totalCount * 100).toFixed(2)}% finished | ETA: ${this.getETA()}`);
+                    this.emit('progress', this.finishCount, this.totalCount);
+                    this.emit('task-finish', task);
                 } catch (e) {
                     this.logger.warning(`Download ${task.url} failed, retry later.`);
                     this.unfinishedTasks.push(task);
                     this.nowRunningThreadsCount--;
+                    this.emit('error', e, task);
                 } finally {
                     this.checkQueue();
                 }

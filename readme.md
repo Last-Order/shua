@@ -109,14 +109,23 @@ shua -f a.txt --threads 16
 ```
 
 ## Use as a library
-
+### Getting Started
 ```JavaScript
 import { Downloader } from 'shua';
 const downloader = new Downloader();
 downloader.addUrlsFromFile('urls.txt');
-downloader.on('downloaded', () => {
+downloader.on('finish', () => {
    console.log('All files downloaded!');  
 });
 downloader.start();
 
 ```
+
+### Events
+
+| Event Name | Parameters |
+|----------|--------------|
+| `progress` | `finishedCount: number, totalCOunt: number`|
+| `task-finish` | `task: Task` |
+| `error` | `err: Error, task: Task` |
+| `finish` | |
