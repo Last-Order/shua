@@ -1,13 +1,16 @@
-const SocksProxyAgent = require('socks-proxy-agent');
 import * as fs from 'fs';
 import { URL } from 'url';
-import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
+import axios from 'axios';
+const http = require('http');
+const https = require('https');
 
 const DEFAULT_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.80 Safari/537.36`;
 
+const axiosInstance = axios.create({
+    httpAgent: new http.Agent({ keepAlive: true }),
+    httpsAgent: new https.Agent({ keepAlive: true }),
+});
 export interface DownloadOptions {
-    /** 代理设置 */
-    proxy?: AxiosProxyConfig;
     /** 超时 单位毫秒  */
     timeout?: number;
     /** Custom HTTP Headers */
@@ -20,7 +23,7 @@ export interface DownloadOptions {
  * @param options 设置
  * @return {Promise<void>}
  */
-export function downloadFile(url, path, { proxy, timeout = 60000, headers }: DownloadOptions = {}): Promise<void> {
+export function downloadFile(url, path, { timeout = 60000, headers }: DownloadOptions = {}): Promise<void> {
     const CancelToken = axios.CancelToken;
     let source = CancelToken.source();
     const promise: Promise<void> = new Promise(async (resolve, reject) => {
@@ -29,11 +32,10 @@ export function downloadFile(url, path, { proxy, timeout = 60000, headers }: Dow
                 source && source.cancel();
                 source = null;
             }, timeout);
-            const response = await axios({
+            const response = await axiosInstance({
                 url,
                 method: 'GET',
                 responseType: 'arraybuffer',
-                httpsAgent: proxy ? new SocksProxyAgent(`socks5h://${proxy.host}:${proxy.port}`) : undefined,
                 headers: {
                     'User-Agent': DEFAULT_USER_AGENT,
                     'Host': new URL(url).host,
