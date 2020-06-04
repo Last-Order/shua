@@ -1,10 +1,10 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { URL } from 'url';
-import { EventEmitter } from 'events';
-import { downloadFile } from '../utils/file';
-import ExpressionParser from './expression_parser';
-import Logger from '../utils/logger';
+import * as fs from "fs";
+import * as path from "path";
+import { URL } from "url";
+import { EventEmitter } from "events";
+import { downloadFile } from "../utils/file";
+import ExpressionParser from "./expression_parser";
+import Logger from "../utils/logger";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -35,7 +35,7 @@ class Downloader extends EventEmitter {
     threads: number = 8;
     timeout: number = 30000;
     headers: object = {};
-    output: string = './shua_download_' + new Date().valueOf().toString();
+    output: string = "./shua_download_" + new Date().valueOf().toString();
     ascending: boolean = false;
 
     // Deps
@@ -50,7 +50,7 @@ class Downloader extends EventEmitter {
     finishCount: number = 0;
     startTime: Date;
     isEnd: boolean = false;
-    /** 
+    /**
      * 所有需要下载的任务
      * 开始后不修改
      */
@@ -60,7 +60,13 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output, ascending, timeout }: Partial<DownloaderOptions>) {
+    constructor({
+        threads,
+        headers,
+        output,
+        ascending,
+        timeout,
+    }: Partial<DownloaderOptions>) {
         super();
         this.logger = new Logger();
         if (threads) {
@@ -70,12 +76,12 @@ class Downloader extends EventEmitter {
             this.timeout = timeout;
         }
         if (headers) {
-            for (const h of headers.toString().split('\n')) {
-                const header = h.split(':');
+            for (const h of headers.toString().split("\n")) {
+                const header = h.split(":");
                 if (header.length < 2) {
                     throw new Error(`HTTP Headers invalid.`);
                 }
-                this.headers[header[0]] = header.slice(1).join(':');
+                this.headers[header[0]] = header.slice(1).join(":");
             }
         }
         if (output) {
@@ -95,12 +101,17 @@ class Downloader extends EventEmitter {
      */
     loadUrlsFromFile(path: string) {
         const text = fs.readFileSync(path).toString();
-        this.tasks.push(...text.split('\n').filter(line => !!line).map(line => {
-            return {
-                url: line,
-                retryCount: 0
-            };
-        }));
+        this.tasks.push(
+            ...text
+                .split("\n")
+                .filter((line) => !!line)
+                .map((line) => {
+                    return {
+                        url: line,
+                        retryCount: 0,
+                    };
+                })
+        );
         this.checkAscending();
     }
 
@@ -110,12 +121,14 @@ class Downloader extends EventEmitter {
      */
     loadUrlsFromExpression(expression: string) {
         const expressionParser = new ExpressionParser(expression);
-        this.tasks.push(...expressionParser.getUrls().map(url => {
-            return {
-                url,
-                retryCount: 0
-            }
-        }));
+        this.tasks.push(
+            ...expressionParser.getUrls().map((url) => {
+                return {
+                    url,
+                    retryCount: 0,
+                };
+            })
+        );
         this.checkAscending();
     }
 
@@ -124,12 +137,14 @@ class Downloader extends EventEmitter {
      * @param urls URL数组
      */
     loadUrlsFromArray(urls: string[]) {
-        this.tasks.push(...urls.map(url => {
-            return {
-                url,
-                retryCount: 0
-            }
-        }));
+        this.tasks.push(
+            ...urls.map((url) => {
+                return {
+                    url,
+                    retryCount: 0,
+                };
+            })
+        );
         this.checkAscending();
     }
 
@@ -139,15 +154,16 @@ class Downloader extends EventEmitter {
             const maxLength = this.tasks.length.toString().length;
             let counter = 0;
             for (const task of this.tasks) {
-                const urlPath = new URL(task.url).pathname.slice(1).split('/');
+                const urlPath = new URL(task.url).pathname.slice(1).split("/");
                 let ext;
-                if (urlPath[urlPath.length - 1].includes('.')) {
-                    ext = urlPath[urlPath.length - 1].split('.').slice(-1)[0];
+                if (urlPath[urlPath.length - 1].includes(".")) {
+                    ext = urlPath[urlPath.length - 1].split(".").slice(-1)[0];
                 }
                 if (ext) {
-                    task.filename = counter.toString().padStart(maxLength, '0') + `.${ext}`;
+                    task.filename =
+                        counter.toString().padStart(maxLength, "0") + `.${ext}`;
                 } else {
-                    task.filename = counter.toString().padStart(maxLength, '0');
+                    task.filename = counter.toString().padStart(maxLength, "0");
                 }
                 counter++;
             }
@@ -165,7 +181,7 @@ class Downloader extends EventEmitter {
         if (process.platform === "win32") {
             const rl = require("readline").createInterface({
                 input: process.stdin,
-                output: process.stdout
+                output: process.stdout,
             });
 
             rl.on("SIGINT", function () {
@@ -192,7 +208,10 @@ class Downloader extends EventEmitter {
         if (this.isEnd) {
             return;
         }
-        if (this.nowRunningThreadsCount < this.threads && this.unfinishedTasks.length > 0) {
+        if (
+            this.nowRunningThreadsCount < this.threads &&
+            this.unfinishedTasks.length > 0
+        ) {
             // 有空余的并发可供使用
             if (this.unfinishedTasks.length > 0) {
                 // 有剩余任务 执行
@@ -203,44 +222,69 @@ class Downloader extends EventEmitter {
                     await this.handleTask(task);
                     this.nowRunningThreadsCount--;
                     this.finishCount++;
-                    this.logger.info(`${this.finishCount} / ${this.totalCount} or ${(this.finishCount / this.totalCount * 100).toFixed(2)}% finished | ETA: ${this.getETA()}`);
-                    this.emit('progress', this.finishCount, this.totalCount);
-                    this.emit('task-finish', task);
+                    this.logger.info(
+                        `${this.finishCount} / ${this.totalCount} or ${(
+                            (this.finishCount / this.totalCount) *
+                            100
+                        ).toFixed(2)}% finished | ETA: ${this.getETA()}`
+                    );
+                    this.emit("progress", this.finishCount, this.totalCount);
+                    this.emit("task-finish", task);
                 } catch (e) {
-                    this.logger.warning(`Download ${task.url} failed, retry later.`);
+                    this.logger.warning(
+                        `Download ${task.url} failed, retry later.`
+                    );
                     this.unfinishedTasks.push(task);
                     this.nowRunningThreadsCount--;
-                    this.emit('error', e, task);
+                    this.emit("task-error", e, task);
                 } finally {
                     this.checkQueue();
                 }
             }
         }
-        if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
+        if (
+            this.nowRunningThreadsCount === 0 &&
+            this.unfinishedTasks.length === 0
+        ) {
             this.isEnd = true;
-            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
-            this.emit('finish');
+            this.logger.info(
+                `All finished. Please checkout your files at [${this.output}]`
+            );
+            this.emit("finish");
         }
     }
 
     async handleTask(task: DownloadTask) {
         const filename = new URL(task.url).pathname.slice(1);
-        const p = filename.split('/');
-        return await downloadFile(task.url, path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]), {
-            ...(Object.keys(this.headers).length > 0 ? this.headers : {}),
-            timeout: this.timeout
-        });
+        const p = filename.split("/");
+        return await downloadFile(
+            task.url,
+            path.resolve(
+                this.output,
+                task.filename !== undefined ? task.filename : p[p.length - 1]
+            ),
+            {
+                ...(Object.keys(this.headers).length > 0 ? this.headers : {}),
+                timeout: this.timeout,
+            }
+        );
     }
 
     getETA() {
         const usedTime = new Date().valueOf() - this.startTime.valueOf();
-        const remainingTimeInSeconds = Math.round(((usedTime / this.finishCount * this.totalCount) - usedTime) / 1000)
+        const remainingTimeInSeconds = Math.round(
+            ((usedTime / this.finishCount) * this.totalCount - usedTime) / 1000
+        );
         if (remainingTimeInSeconds < 60) {
             return `${remainingTimeInSeconds}s`;
         } else if (remainingTimeInSeconds < 3600) {
-            return `${Math.floor(remainingTimeInSeconds / 60)}m ${remainingTimeInSeconds % 60}s`;
+            return `${Math.floor(remainingTimeInSeconds / 60)}m ${
+                remainingTimeInSeconds % 60
+            }s`;
         } else {
-            return `${Math.floor(remainingTimeInSeconds / 3600)}h ${Math.floor((remainingTimeInSeconds % 3600) / 60)}m ${remainingTimeInSeconds % 60}s`;
+            return `${Math.floor(remainingTimeInSeconds / 3600)}h ${Math.floor(
+                (remainingTimeInSeconds % 3600) / 60
+            )}m ${remainingTimeInSeconds % 60}s`;
         }
     }
 }

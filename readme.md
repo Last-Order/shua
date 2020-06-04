@@ -13,6 +13,7 @@ npm install -g shua
 Note: Shua needs Node.js 12.0.0+.
 
 ## Usage
+
 ```
 Shua / A lovely downloader / 1.0.7
 
@@ -40,9 +41,6 @@ Options:
          <path>                    (Optional) Output files path
      --ascending                   Rename output files numerical ascendingly
 ```
-
-
-
 
 ## Expressions
 
@@ -88,6 +86,7 @@ Use the following expression
 `shua -e "https://example.com/segment{{%d(1, 5)}}_{{%d(1, 10)}}.ts"`
 
 To download
+
 ```
 https://example.com/segment001.ts
 https://example.com/segment002.ts
@@ -109,13 +108,15 @@ shua -f a.txt --threads 16
 ```
 
 ## Use as a library
+
 ### Getting Started
+
 ```JavaScript
 import { Downloader } from 'shua';
 const downloader = new Downloader();
 downloader.addUrlsFromFile('urls.txt');
 downloader.on('finish', () => {
-   console.log('All files downloaded!');  
+   console.log('All files downloaded!');
 });
 downloader.start();
 
@@ -123,9 +124,9 @@ downloader.start();
 
 ### Events
 
-| Event Name | Parameters |
-|----------|--------------|
-| `progress` | `finishedCount: number, totalCOunt: number`|
-| `task-finish` | `task: Task` |
-| `error` | `err: Error, task: Task` |
-| `finish` | |
+| Event Name    | Parameters                                  |
+| ------------- | ------------------------------------------- |
+| `progress`    | `finishedCount: number, totalCOunt: number` |
+| `task-finish` | `task: Task`                                |
+| `task-error`  | `err: Error, task: Task`                    |
+| `finish`      |                                             |
