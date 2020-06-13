@@ -32,7 +32,7 @@ export function downloadFile(url, path, { timeout = 60000, headers }: DownloadOp
                 source && source.cancel();
                 source = null;
             }, timeout);
-            const response = await axiosInstance({
+            let response = await axiosInstance({
                 url,
                 method: 'GET',
                 responseType: 'arraybuffer',
@@ -47,6 +47,7 @@ export function downloadFile(url, path, { timeout = 60000, headers }: DownloadOp
                 reject('Bad response');
             }
             fs.writeFileSync(path, response.data);
+            response = null;
             resolve();
         } catch (e) {
             reject(e);
