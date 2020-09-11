@@ -264,7 +264,7 @@ class Downloader extends EventEmitter {
                 task.filename !== undefined ? task.filename : p[p.length - 1]
             ),
             {
-                ...(Object.keys(this.headers).length > 0 ? this.headers : {}),
+                ...(Object.keys(this.headers).length > 0 ? { headers: this.headers } : {}),
                 timeout: this.timeout,
             }
         );
