@@ -4,7 +4,7 @@ import { URL } from "url";
 import { EventEmitter } from "events";
 import { downloadFile } from "../utils/file";
 import ExpressionParser from "./expression_parser";
-import Logger from "../utils/logger";
+import { ConsoleLogger as Logger } from "../utils/logger";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -17,6 +17,8 @@ export interface DownloaderOptions {
     output: string;
     /** 是否以数字增序重命名文件 */
     ascending: boolean;
+    /** 是否启用调试输出 */
+    verbose?: boolean;
 }
 /**
  * 下载任务结构
@@ -37,6 +39,7 @@ class Downloader extends EventEmitter {
     headers: object = {};
     output: string = "./shua_download_" + new Date().valueOf().toString();
     ascending: boolean = false;
+    verbose: boolean = false;
 
     // Deps
     logger: Logger;
@@ -66,6 +69,7 @@ class Downloader extends EventEmitter {
         output,
         ascending,
         timeout,
+        verbose,
     }: Partial<DownloaderOptions>) {
         super();
         this.logger = new Logger();
@@ -92,6 +96,10 @@ class Downloader extends EventEmitter {
         }
         if (ascending) {
             this.ascending = ascending;
+        }
+        if (verbose) {
+            this.verbose = verbose;
+            this.logger.enableDebug();
         }
     }
 
@@ -234,6 +242,7 @@ class Downloader extends EventEmitter {
                     this.logger.warning(
                         `Download ${task.url} failed, retry later.`
                     );
+                    this.logger.debug(e);
                     this.unfinishedTasks.push(task);
                     this.nowRunningThreadsCount--;
                     this.emit("task-error", e, task);

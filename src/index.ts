@@ -111,6 +111,11 @@ Erii.addOption({
 });
 
 Erii.addOption({
+    name: ['verbose', 'debug'],
+    description: 'Debug output'
+});
+
+Erii.addOption({
     name: ['ascending'],
     description: 'Rename output files numerical ascendingly'
 });
