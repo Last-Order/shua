@@ -240,7 +240,15 @@ class Downloader extends EventEmitter {
                     this.emit("task-finish", task);
                 } catch (e) {
                     this.logger.warning(
-                        `Download ${task.url} failed, retry later.`
+                        `Download ${task.url} failed, retry later. [${
+                            e.code ||
+                            (e.response
+                                ? `${e.response.status} ${e.response.statusText}`
+                                : undefined) ||
+                            e.message ||
+                            e.constructor.name ||
+                            "UNKNOWN"
+                        }]`
                     );
                     this.logger.debug(e);
                     this.unfinishedTasks.push(task);
@@ -273,7 +281,9 @@ class Downloader extends EventEmitter {
                 task.filename !== undefined ? task.filename : p[p.length - 1]
             ),
             {
-                ...(Object.keys(this.headers).length > 0 ? { headers: this.headers } : {}),
+                ...(Object.keys(this.headers).length > 0
+                    ? { headers: this.headers }
+                    : {}),
                 timeout: this.timeout,
             }
         );
