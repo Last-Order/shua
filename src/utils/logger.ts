@@ -1,8 +1,9 @@
-abstract class Logger {
+export abstract class Logger {
     public abstract debug(message: string);
     public abstract info(message: string, infoObj?: any);
     public abstract warning(message: string);
     public abstract error(message: string, error?: any);
+    public abstract enableDebug(): void;
 }
 
 export class ConsoleLogger extends Logger {

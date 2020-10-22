@@ -4,7 +4,7 @@ import { URL } from "url";
 import { EventEmitter } from "events";
 import { downloadFile } from "../utils/file";
 import ExpressionParser from "./expression_parser";
-import { ConsoleLogger as Logger } from "../utils/logger";
+import { ConsoleLogger, Logger } from "../utils/logger";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -19,6 +19,8 @@ export interface DownloaderOptions {
     ascending: boolean;
     /** 是否启用调试输出 */
     verbose?: boolean;
+    /** 自定义 Logger */
+    logger?: Logger;
 }
 /**
  * 下载任务结构
@@ -70,9 +72,10 @@ class Downloader extends EventEmitter {
         ascending,
         timeout,
         verbose,
+        logger,
     }: Partial<DownloaderOptions>) {
         super();
-        this.logger = new Logger();
+        this.logger = logger || new ConsoleLogger();
         if (threads) {
             this.threads = threads;
         }
