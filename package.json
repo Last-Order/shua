@@ -21,7 +21,7 @@
     },
     "homepage": "https://github.com/Last-Order/shua#readme",
     "dependencies": {
-        "axios": "^0.19.1",
+        "axios": "^0.21.1",
         "erii": "^2.0.0",
         "socks-proxy-agent": "^4.0.2"
     },
