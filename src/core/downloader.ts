@@ -96,7 +96,7 @@ class Downloader extends EventEmitter {
                     }
                 }
             }
-            console.log(this.headers)
+            console.log(this.headers);
         }
         if (output) {
             if (!fs.existsSync(output)) {
@@ -122,7 +122,12 @@ class Downloader extends EventEmitter {
         this.tasks.push(
             ...text
                 .split("\n")
-                .filter((line) => !!line)
+                .filter(
+                    (line) =>
+                        !!line &&
+                        (line.startsWith("http://") ||
+                            line.startsWith("https://"))
+                )
                 .map((line) => {
                     return {
                         url: line,
