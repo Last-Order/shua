@@ -83,13 +83,20 @@ class Downloader extends EventEmitter {
             this.timeout = timeout;
         }
         if (headers) {
-            for (const h of headers.toString().split("\n")) {
-                const header = h.split(":");
-                if (header.length < 2) {
-                    throw new Error(`HTTP Headers invalid.`);
+            const headerConfigArr = Array.isArray(headers)
+                ? headers
+                : [headers];
+            for (const headerConfig of headerConfigArr) {
+                for (const h of headerConfig.split("\\n")) {
+                    try {
+                        const header = /^([^ :]+):(.+)$/.exec(h).slice(1);
+                        this.headers[header[0]] = header[1].trim();
+                    } catch (e) {
+                        logger.warning(`HTTP Headers invalid. Ignored.`);
+                    }
                 }
-                this.headers[header[0]] = header.slice(1).join(":");
             }
+            console.log(this.headers)
         }
         if (output) {
             if (!fs.existsSync(output)) {

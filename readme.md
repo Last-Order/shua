@@ -32,7 +32,7 @@ Options:
 
      Options                       Description
      --headers <headers>           Custom HTTP headers
-         <headers>                 (Optional) Custom HTTP headers. Multi headers should be splitted with "\n"
+         <headers>                 (Optional) Custom HTTP headers.
      --threads <limit>             Threads limit
          <limit>                   (Optional) Limit of threads, defaults to 8
      --timeout <limit>             Timeout threshold for each segment.
