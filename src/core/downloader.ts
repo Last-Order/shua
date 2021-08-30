@@ -96,7 +96,6 @@ class Downloader extends EventEmitter {
                     }
                 }
             }
-            console.log(this.headers);
         }
         if (output) {
             if (!fs.existsSync(output)) {
