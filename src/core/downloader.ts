@@ -32,7 +32,11 @@ export interface DownloadTask {
     retryCount: number;
     /** 输出文件名 */
     filename?: string;
+    /** 自定义 Headers */
+    headers?: Record<string, string>;
 }
+
+export class JSONParseError extends Error {}
 
 class Downloader extends EventEmitter {
     // Config
@@ -65,15 +69,7 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({
-        threads,
-        headers,
-        output,
-        ascending,
-        timeout,
-        verbose,
-        logger,
-    }: Partial<DownloaderOptions>) {
+    constructor({ threads, headers, output, ascending, timeout, verbose, logger }: Partial<DownloaderOptions>) {
         super();
         this.logger = logger || new ConsoleLogger();
         if (threads) {
@@ -83,9 +79,7 @@ class Downloader extends EventEmitter {
             this.timeout = timeout;
         }
         if (headers) {
-            const headerConfigArr = Array.isArray(headers)
-                ? headers
-                : [headers];
+            const headerConfigArr = Array.isArray(headers) ? headers : [headers];
             for (const headerConfig of headerConfigArr) {
                 for (const h of headerConfig.split("\\n")) {
                     try {
@@ -121,12 +115,7 @@ class Downloader extends EventEmitter {
         this.tasks.push(
             ...text
                 .split("\n")
-                .filter(
-                    (line) =>
-                        !!line &&
-                        (line.startsWith("http://") ||
-                            line.startsWith("https://"))
-                )
+                .filter((line) => !!line && (line.startsWith("http://") || line.startsWith("https://")))
                 .map((line) => {
                     return {
                         url: line,
@@ -170,6 +159,27 @@ class Downloader extends EventEmitter {
         this.checkAscending();
     }
 
+    /**
+     * 从 JSON 文件添加任务
+     * @param path
+     */
+    loadUrlsFromJSON(path: string) {
+        const text = fs.readFileSync(path).toString();
+        const tasks = JSON.parse(text);
+        if (!tasks?.length) {
+            throw new JSONParseError(`Invalid JSON file.`);
+        }
+        if (tasks.some((task) => !task.url)) {
+            throw new JSONParseError(`Missing URL for tasks in JSON file.`);
+        }
+        this.tasks.push(
+            ...tasks.map((task) => ({
+                ...task,
+                retryCount: 0,
+            }))
+        );
+    }
+
     checkAscending() {
         if (this.ascending) {
             // 增序重命名文件
@@ -182,8 +192,7 @@ class Downloader extends EventEmitter {
                     ext = urlPath[urlPath.length - 1].split(".").slice(-1)[0];
                 }
                 if (ext) {
-                    task.filename =
-                        counter.toString().padStart(maxLength, "0") + `.${ext}`;
+                    task.filename = counter.toString().padStart(maxLength, "0") + `.${ext}`;
                 } else {
                     task.filename = counter.toString().padStart(maxLength, "0");
                 }
@@ -230,10 +239,7 @@ class Downloader extends EventEmitter {
         if (this.isEnd) {
             return;
         }
-        if (
-            this.nowRunningThreadsCount < this.threads &&
-            this.unfinishedTasks.length > 0
-        ) {
+        if (this.nowRunningThreadsCount < this.threads && this.unfinishedTasks.length > 0) {
             // 有空余的并发可供使用
             if (this.unfinishedTasks.length > 0) {
                 // 有剩余任务 执行
@@ -256,9 +262,7 @@ class Downloader extends EventEmitter {
                     this.logger.warning(
                         `Download ${task.url} failed, retry later. [${
                             e.code ||
-                            (e.response
-                                ? `${e.response.status} ${e.response.statusText}`
-                                : undefined) ||
+                            (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
                             e.message ||
                             e.constructor.name ||
                             "UNKNOWN"
@@ -273,14 +277,9 @@ class Downloader extends EventEmitter {
                 }
             }
         }
-        if (
-            this.nowRunningThreadsCount === 0 &&
-            this.unfinishedTasks.length === 0
-        ) {
+        if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
             this.isEnd = true;
-            this.logger.info(
-                `All finished. Please checkout your files at [${this.output}]`
-            );
+            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
             this.emit("finish");
         }
     }
@@ -290,14 +289,10 @@ class Downloader extends EventEmitter {
         const p = filename.split("/");
         return await downloadFile(
             task.url,
-            path.resolve(
-                this.output,
-                task.filename !== undefined ? task.filename : p[p.length - 1]
-            ),
+            path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]),
             {
-                ...(Object.keys(this.headers).length > 0
-                    ? { headers: this.headers }
-                    : {}),
+                ...(Object.keys(this.headers).length > 0 ? { headers: this.headers } : {}),
+                ...(task.headers ? task.headers : {}),
                 timeout: this.timeout,
             }
         );
@@ -305,15 +300,11 @@ class Downloader extends EventEmitter {
 
     getETA() {
         const usedTime = new Date().valueOf() - this.startTime.valueOf();
-        const remainingTimeInSeconds = Math.round(
-            ((usedTime / this.finishCount) * this.totalCount - usedTime) / 1000
-        );
+        const remainingTimeInSeconds = Math.round(((usedTime / this.finishCount) * this.totalCount - usedTime) / 1000);
         if (remainingTimeInSeconds < 60) {
             return `${remainingTimeInSeconds}s`;
         } else if (remainingTimeInSeconds < 3600) {
-            return `${Math.floor(remainingTimeInSeconds / 60)}m ${
-                remainingTimeInSeconds % 60
-            }s`;
+            return `${Math.floor(remainingTimeInSeconds / 60)}m ${remainingTimeInSeconds % 60}s`;
         } else {
             return `${Math.floor(remainingTimeInSeconds / 3600)}h ${Math.floor(
                 (remainingTimeInSeconds % 3600) / 60
