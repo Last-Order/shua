@@ -1,10 +1,9 @@
-import * as fs from 'fs';
-import { URL } from 'url';
-import axios from 'axios';
-const http = require('http');
-const https = require('https');
-
-const DEFAULT_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.80 Safari/537.36`;
+import * as fs from "fs";
+import { URL } from "url";
+import axios from "axios";
+import logger from "./logger";
+const http = require("http");
+const https = require("https");
 
 const axiosInstance = axios.create({
     httpAgent: new http.Agent({ keepAlive: true }),
@@ -34,17 +33,19 @@ export function downloadFile(url, path, { timeout = 60000, headers }: DownloadOp
             }, timeout);
             let response = await axiosInstance({
                 url,
-                method: 'GET',
-                responseType: 'arraybuffer',
+                method: "GET",
+                responseType: "arraybuffer",
                 headers: {
-                    'User-Agent': DEFAULT_USER_AGENT,
-                    'Host': new URL(url).host,
-                    ...headers
+                    Host: new URL(url).host,
+                    ...headers,
                 },
                 cancelToken: source.token,
             });
-            if (response.headers['content-length'] && parseInt(response.headers['content-length']) !== response.data.length) {
-                reject('Bad response');
+            if (
+                response.headers["content-length"] &&
+                parseInt(response.headers["content-length"]) !== response.data.length
+            ) {
+                reject("Bad response");
             }
             fs.writeFileSync(path, response.data);
             response = null;
@@ -56,4 +57,46 @@ export function downloadFile(url, path, { timeout = 60000, headers }: DownloadOp
         }
     });
     return promise;
+}
+
+export function loadRemoteFile(url: string, { timeout = 3000, headers }: DownloadOptions = {}) {
+    return new Promise(async (resolve, reject) => {
+        let retries = 5;
+        while (retries > 0) {
+            const CancelToken = axios.CancelToken;
+            let source = CancelToken.source();
+            try {
+                setTimeout(() => {
+                    source && source.cancel();
+                    source = null;
+                }, timeout);
+                const response = await axios({
+                    url,
+                    method: "GET",
+                    responseType: "text",
+                    headers: {
+                        Host: new URL(url).host,
+                        ...headers,
+                    },
+                    cancelToken: source.token,
+                });
+                resolve(response.data);
+            } catch (e) {
+                logger.warning(
+                    `Load remote file error, retry. [${
+                        e.code ||
+                        (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
+                        e.message ||
+                        e.constructor.name ||
+                        "UNKNOWN"
+                    }]`
+                );
+                logger.debug(e);
+                retries--;
+                if (retries <= 0) {
+                    reject(e);
+                }
+            }
+        }
+    });
 }

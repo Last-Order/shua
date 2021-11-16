@@ -28,10 +28,10 @@ Erii.bind({
         name: 'input_path',
         description: 'file path',
     }
-}, (ctx, options) => {
+}, async (ctx, options) => {
     const path = ctx.getArgument().toString();
     const downloader = new Downloader(options);
-    downloader.loadUrlsFromFile(path);
+    await downloader.loadUrlsFromFile(path);
     downloader.start();
     downloader.once('finish', () => {
         process.exit();

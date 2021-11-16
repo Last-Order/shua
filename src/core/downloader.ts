@@ -2,9 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { URL } from "url";
 import { EventEmitter } from "events";
-import { downloadFile } from "../utils/file";
+import axios from "axios";
+import { downloadFile, loadRemoteFile } from "../utils/file";
 import ExpressionParser from "./expression_parser";
 import { ConsoleLogger, Logger } from "../utils/logger";
+import { DEFAULT_USER_AGENT } from "../constants";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -37,12 +39,13 @@ export interface DownloadTask {
 }
 
 export class JSONParseError extends Error {}
+export class LoadRemoteFileError extends Error {}
 
 class Downloader extends EventEmitter {
     // Config
     threads: number = 8;
     timeout: number = 30000;
-    headers: object = {};
+    headers: Record<string, unknown> = {};
     output: string = "./shua_download_" + new Date().valueOf().toString();
     ascending: boolean = false;
     verbose: boolean = false;
@@ -90,6 +93,12 @@ class Downloader extends EventEmitter {
                     }
                 }
             }
+            // Apply global custom headers
+            axios.defaults.headers.common = {
+                ...axios.defaults.headers.common,
+                "User-Agent": DEFAULT_USER_AGENT,
+                ...this.headers,
+            };
         }
         if (output) {
             if (!fs.existsSync(output)) {
@@ -110,15 +119,24 @@ class Downloader extends EventEmitter {
      * 从文件添加下载文件 URL
      * @param path 文件路径
      */
-    loadUrlsFromFile(path: string) {
-        const text = fs.readFileSync(path).toString();
+    async loadUrlsFromFile(path: string) {
+        let text;
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            try {
+                text = await loadRemoteFile(path);
+            } catch (e) {
+                throw new LoadRemoteFileError(`Load remote file failed.`);
+            }
+        } else {
+            text = fs.readFileSync(path).toString();
+        }
         this.tasks.push(
             ...text
                 .split("\n")
                 .filter((line) => !!line && (line.startsWith("http://") || line.startsWith("https://")))
                 .map((line) => {
                     return {
-                        url: line,
+                        url: line.trim(),
                         retryCount: 0,
                     };
                 })
@@ -291,7 +309,6 @@ class Downloader extends EventEmitter {
             task.url,
             path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]),
             {
-                ...(Object.keys(this.headers).length > 0 ? { headers: this.headers } : {}),
                 ...(task.headers ? task.headers : {}),
                 timeout: this.timeout,
             }
