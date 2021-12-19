@@ -121,8 +121,11 @@ class Downloader extends EventEmitter {
      */
     async loadUrlsFromFile(path: string) {
         let text;
+        let isLoadFromRemote = false;
         if (path.startsWith("http://") || path.startsWith("https://")) {
             try {
+                this.logger.debug(`Load file from ${path}`);
+                isLoadFromRemote = true;
                 text = await loadRemoteFile(path);
             } catch (e) {
                 throw new LoadRemoteFileError(`Load remote file failed.`);
@@ -130,17 +133,28 @@ class Downloader extends EventEmitter {
         } else {
             text = fs.readFileSync(path).toString();
         }
-        this.tasks.push(
-            ...text
-                .split("\n")
-                .filter((line) => !!line && (line.startsWith("http://") || line.startsWith("https://")))
-                .map((line) => {
-                    return {
-                        url: line.trim(),
-                        retryCount: 0,
-                    };
-                })
-        );
+        const tasks: DownloadTask[] = [];
+        const lines = text.split("\n").map((line) => line.trim()).filter((line) => !!line);
+        for (const line of lines) {
+            let url;
+            if (line.startsWith("#")) {
+                continue;
+            }
+            if (line.startsWith("http://") || line.startsWith("https://")) {
+                url = line;
+            } else if (isLoadFromRemote) {
+                console.log(line)
+                try {
+                    url = new URL(line, path).href;
+                } catch (e) {
+                    // ignore
+                }
+            }
+            if (url) {
+                tasks.push({ url, retryCount: 0 });
+            }
+        }
+        this.tasks.push(...tasks);
         this.checkAscending();
     }
 
