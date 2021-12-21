@@ -210,6 +210,7 @@ class Downloader extends EventEmitter {
                 retryCount: 0,
             }))
         );
+        this.checkAscending();
     }
 
     checkAscending() {
@@ -323,7 +324,7 @@ class Downloader extends EventEmitter {
             task.url,
             path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]),
             {
-                ...(task.headers ? task.headers : {}),
+                ...(task.headers ? { headers: task.headers } : {}),
                 timeout: this.timeout,
             }
         );
