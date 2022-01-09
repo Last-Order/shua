@@ -81,6 +81,9 @@ class Downloader extends EventEmitter {
         if (timeout) {
             this.timeout = timeout;
         }
+        this.headers = {
+            "User-Agent": DEFAULT_USER_AGENT,
+        };
         if (headers) {
             const headerConfigArr = Array.isArray(headers) ? headers : [headers];
             for (const headerConfig of headerConfigArr) {
@@ -93,12 +96,12 @@ class Downloader extends EventEmitter {
                     }
                 }
             }
-            // Apply global custom headers
-            axios.defaults.headers.common = {
-                ...axios.defaults.headers.common,
-                "User-Agent": DEFAULT_USER_AGENT,
-                ...this.headers,
-            };
+            // // Apply global custom headers
+            // axios.defaults.headers.common = {
+            //     ...axios.defaults.headers.common,
+            //     "User-Agent": DEFAULT_USER_AGENT,
+            //     ...this.headers,
+            // };
         }
         if (output) {
             if (!fs.existsSync(output)) {
@@ -134,7 +137,10 @@ class Downloader extends EventEmitter {
             text = fs.readFileSync(path).toString();
         }
         const tasks: DownloadTask[] = [];
-        const lines = text.split("\n").map((line) => line.trim()).filter((line) => !!line);
+        const lines = text
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => !!line);
         for (const line of lines) {
             let url;
             if (line.startsWith("#")) {
@@ -143,7 +149,6 @@ class Downloader extends EventEmitter {
             if (line.startsWith("http://") || line.startsWith("https://")) {
                 url = line;
             } else if (isLoadFromRemote) {
-                console.log(line)
                 try {
                     url = new URL(line, path).href;
                 } catch (e) {
@@ -301,7 +306,7 @@ class Downloader extends EventEmitter {
                             "UNKNOWN"
                         }]`
                     );
-                    this.logger.debug(e);
+                    this.logger.debug(e.request);
                     this.unfinishedTasks.push(task);
                     this.nowRunningThreadsCount--;
                     this.emit("task-error", e, task);
@@ -324,7 +329,16 @@ class Downloader extends EventEmitter {
             task.url,
             path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]),
             {
-                ...(task.headers ? { headers: task.headers } : {}),
+                ...(task.headers
+                    ? {
+                          headers: {
+                              ...this.headers,
+                              ...task.headers,
+                          },
+                      }
+                    : {
+                          headers: { ...this.headers },
+                      }),
                 timeout: this.timeout,
             }
         );

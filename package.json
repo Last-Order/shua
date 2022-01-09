@@ -1,6 +1,6 @@
 {
     "name": "shua",
-    "version": "2.0.9",
+    "version": "2.0.11",
     "description": "A lovely downloader",
     "main": "dist/exports.js",
     "types": "dist/exports.d.ts",
@@ -21,7 +21,7 @@
     },
     "homepage": "https://github.com/Last-Order/shua#readme",
     "dependencies": {
-        "axios": "^0.21.4",
+        "axios": "^0.24.0",
         "erii": "^2.0.3"
     },
     "devDependencies": {

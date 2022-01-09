@@ -5,7 +5,7 @@
         "declaration": true,
         "module": "commonjs",
         "sourceMap": true,
-        "lib": ["es6", "es7", "esnext"],
+        "lib": ["es6", "es7", "esnext", "DOM"],
         "experimentalDecorators": true,
         "downlevelIteration": true,
         "newLine": "LF"
