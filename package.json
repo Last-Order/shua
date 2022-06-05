@@ -22,6 +22,7 @@
     "homepage": "https://github.com/Last-Order/shua#readme",
     "dependencies": {
         "axios": "^0.26.0",
+        "cli-progress": "^3.11.1",
         "erii": "^2.0.3"
     },
     "devDependencies": {

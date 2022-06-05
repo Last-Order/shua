@@ -100,3 +100,67 @@ export function loadRemoteFile(url: string, { timeout = 3000, headers }: Downloa
         }
     });
 }
+
+/**
+ * 二进制连接文件
+ * @param fileList
+ * @param output
+ * @returns
+ */
+export function concat(fileList = [], output = "./output") {
+    const cliProgress = require("cli-progress");
+    return new Promise<string>(async (resolve) => {
+        if (fileList.length === 0) {
+            resolve(output);
+        }
+
+        const writeStream = fs.createWriteStream(output);
+        const lastIndex = fileList.length - 1;
+        const bar = new cliProgress.SingleBar(
+            {
+                format: "[MERGING] [{bar}] {percentage}% | ETA: {eta}s | {value}/{total}",
+            },
+            cliProgress.Presets.shades_classic
+        );
+        bar.start(fileList.length, 0);
+        let i = 0;
+        let writable = true;
+        write();
+        function write() {
+            writable = true;
+            while (i <= lastIndex && writable) {
+                writable = writeStream.write(fs.readFileSync(fileList[i]), () => {
+                    if (i > lastIndex) {
+                        bar.update(i);
+                        bar.stop();
+                        writeStream.end();
+                        resolve(output);
+                    }
+                });
+                bar.update(i);
+                i++;
+            }
+            if (i <= lastIndex) {
+                writeStream.once("drain", () => {
+                    write();
+                });
+            }
+        }
+    });
+}
+
+/** 获得文件后缀名 */
+export function getFileExt(filePath: string): string {
+    let ext = "";
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+        const urlPath = new URL(filePath).pathname.slice(1).split("/");
+        if (urlPath[urlPath.length - 1].includes(".")) {
+            ext = urlPath[urlPath.length - 1].split(".").slice(-1)[0];
+        }
+    } else {
+        const filePathArr = filePath.split("/");
+        const filename = filePathArr[filePathArr.length - 1];
+        ext = filename.includes(".") ? filename.split(".").slice(-1)[0] : "";
+    }
+    return ext;
+}

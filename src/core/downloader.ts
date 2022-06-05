@@ -2,8 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { URL } from "url";
 import { EventEmitter } from "events";
-import axios from "axios";
-import { downloadFile, loadRemoteFile } from "../utils/file";
+import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
 import ExpressionParser from "./expression_parser";
 import { ConsoleLogger, Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
@@ -19,6 +18,8 @@ export interface DownloaderOptions {
     output: string;
     /** 是否以数字增序重命名文件 */
     ascending: boolean;
+    /** 是否二进制连接下载文件 */
+    concat: boolean;
     /** 是否启用调试输出 */
     verbose?: boolean;
     /** 自定义 Logger */
@@ -48,6 +49,7 @@ class Downloader extends EventEmitter {
     headers: Record<string, unknown> = {};
     output: string = "./shua_download_" + new Date().valueOf().toString();
     ascending: boolean = false;
+    concat: boolean = false;
     verbose: boolean = false;
 
     // Deps
@@ -72,7 +74,7 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output, ascending, timeout, verbose, logger }: Partial<DownloaderOptions>) {
+    constructor({ threads, headers, output, ascending, concat, timeout, verbose, logger }: Partial<DownloaderOptions>) {
         super();
         this.logger = logger || new ConsoleLogger();
         if (threads) {
@@ -96,12 +98,6 @@ class Downloader extends EventEmitter {
                     }
                 }
             }
-            // // Apply global custom headers
-            // axios.defaults.headers.common = {
-            //     ...axios.defaults.headers.common,
-            //     "User-Agent": DEFAULT_USER_AGENT,
-            //     ...this.headers,
-            // };
         }
         if (output) {
             if (!fs.existsSync(output)) {
@@ -111,6 +107,9 @@ class Downloader extends EventEmitter {
         }
         if (ascending) {
             this.ascending = ascending;
+        }
+        if (concat) {
+            this.concat = concat;
         }
         if (verbose) {
             this.verbose = verbose;
@@ -224,16 +223,8 @@ class Downloader extends EventEmitter {
             const maxLength = this.tasks.length.toString().length;
             let counter = 0;
             for (const task of this.tasks) {
-                const urlPath = new URL(task.url).pathname.slice(1).split("/");
-                let ext;
-                if (urlPath[urlPath.length - 1].includes(".")) {
-                    ext = urlPath[urlPath.length - 1].split(".").slice(-1)[0];
-                }
-                if (ext) {
-                    task.filename = counter.toString().padStart(maxLength, "0") + `.${ext}`;
-                } else {
-                    task.filename = counter.toString().padStart(maxLength, "0");
-                }
+                const ext = getFileExt(task.url);
+                task.filename = counter.toString().padStart(maxLength, "0") + (ext ? `.${ext}` : "");
                 counter++;
             }
         }
@@ -317,8 +308,7 @@ class Downloader extends EventEmitter {
         }
         if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
             this.isEnd = true;
-            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
-            this.emit("finish");
+            this.beforeFinish();
         }
     }
 
@@ -342,6 +332,21 @@ class Downloader extends EventEmitter {
                 timeout: this.timeout,
             }
         );
+    }
+
+    async beforeFinish() {
+        if (this.concat) {
+            const ext = getFileExt(this.tasks[0].filename);
+            const outputPath = path.resolve(this.output, `_shua_result${ext ? `.${ext}` : ""}`);
+            await concat(
+                this.tasks.map((t) => path.resolve(this.output, t.filename)),
+                outputPath
+            );
+            this.logger.info(`All finished. Please checkout your files at [${outputPath}]`);
+        } else {
+            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
+        }
+        this.emit("finish");
     }
 
     getETA() {
