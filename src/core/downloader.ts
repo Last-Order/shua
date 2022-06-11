@@ -130,6 +130,7 @@ class Downloader extends EventEmitter {
                 this.logger.debug(`Load file from ${path}`);
                 isLoadFromRemote = true;
                 text = await loadRemoteFile(path);
+                this.logger.info(`Load file from ${path} success.`);
             } catch (e) {
                 throw new LoadRemoteFileError(`Load remote file failed.`);
             }
