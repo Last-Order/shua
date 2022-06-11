@@ -6,6 +6,7 @@ import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file"
 import ExpressionParser from "./expression_parser";
 import { ConsoleLogger, Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
+import TaskScheduler, { TaskErrorEvent, TaskFinishEvent } from "./task_scheduler";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -258,58 +259,39 @@ class Downloader extends EventEmitter {
             fs.mkdirSync(this.output);
         }
 
-        this.checkQueue();
-    }
-
-    /**
-     * 检查下载队列
-     */
-    async checkQueue() {
-        if (this.isEnd) {
-            return;
-        }
-        if (this.nowRunningThreadsCount < this.threads && this.unfinishedTasks.length > 0) {
-            // 有空余的并发可供使用
-            if (this.unfinishedTasks.length > 0) {
-                // 有剩余任务 执行
-                const task = this.unfinishedTasks.shift();
-                this.nowRunningThreadsCount++;
-                this.checkQueue();
-                try {
-                    await this.handleTask(task);
-                    this.nowRunningThreadsCount--;
-                    this.finishCount++;
-                    this.logger.info(
-                        `${this.finishCount} / ${this.totalCount} or ${(
-                            (this.finishCount / this.totalCount) *
-                            100
-                        ).toFixed(2)}% finished | ETA: ${this.getETA()}`
-                    );
-                    this.emit("progress", this.finishCount, this.totalCount);
-                    this.emit("task-finish", task);
-                } catch (e) {
-                    this.logger.warning(
-                        `Download ${task.url} failed, retry later. [${
-                            e.code ||
-                            (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
-                            e.message ||
-                            e.constructor.name ||
-                            "UNKNOWN"
-                        }]`
-                    );
-                    this.logger.debug(e.request);
-                    this.unfinishedTasks.push(task);
-                    this.nowRunningThreadsCount--;
-                    this.emit("task-error", e, task);
-                } finally {
-                    this.checkQueue();
-                }
-            }
-        }
-        if (this.nowRunningThreadsCount === 0 && this.unfinishedTasks.length === 0) {
-            this.isEnd = true;
-            this.beforeFinish();
-        }
+        const scheduler = new TaskScheduler<DownloadTask>({
+            threads: this.threads,
+        });
+        scheduler.addTasks(
+            this.tasks.map((task) => ({
+                handler: this.handleTask.bind(this),
+                payload: task,
+            }))
+        );
+        scheduler.on("task-finish", ({ task, finishCount }: TaskFinishEvent<DownloadTask>) => {
+            this.finishCount++;
+            this.logger.info(
+                `${this.finishCount} / ${this.totalCount} or ${((this.finishCount / this.totalCount) * 100).toFixed(
+                    2
+                )}% finished | ETA: ${this.getETA()}`
+            );
+            this.emit("progress", this.finishCount, this.totalCount);
+        });
+        scheduler.on("task-error", ({ task, error: e, decision }: TaskErrorEvent<DownloadTask, any>) => {
+            this.logger.warning(
+                `Download ${task.payload.url} failed, retry later. [${
+                    e.code ||
+                    (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
+                    e.message ||
+                    e.constructor.name ||
+                    "UNKNOWN"
+                }]`
+            );
+            this.logger.debug(e.request);
+            this.emit("task-error", e, task);
+        });
+        scheduler.once("finish", this.beforeFinish.bind(this));
+        scheduler.start();
     }
 
     async handleTask(task: DownloadTask) {

@@ -80,8 +80,10 @@ export function loadRemoteFile(url: string, { timeout = 3000, headers }: Downloa
                     },
                     cancelToken: source.token,
                 });
+                retries = 0;
                 resolve(response.data);
             } catch (e) {
+                console.log(url)
                 logger.warning(
                     `Load remote file error, retry. [${
                         e.code ||
