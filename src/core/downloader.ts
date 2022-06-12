@@ -6,11 +6,13 @@ import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file"
 import ExpressionParser from "./expression_parser";
 import { ConsoleLogger, Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
-import TaskScheduler, { TaskErrorEvent, TaskFinishEvent } from "./task_scheduler";
+import TaskScheduler, { TaskErrorEvent, TaskFailDecision, TaskFinishEvent } from "./task_scheduler";
 
 export interface DownloaderOptions {
     /** 并发数量 */
     threads: number;
+    /** 最大重试次数 */
+    retries: number;
     /** 超时阈值 */
     timeout: number;
     /** Custom HTTP Headers */
@@ -46,6 +48,7 @@ export class LoadRemoteFileError extends Error {}
 class Downloader extends EventEmitter {
     // Config
     threads: number = 8;
+    retries: number = 5;
     timeout: number = 30000;
     headers: Record<string, unknown> = {};
     output: string = "./shua_download_" + new Date().valueOf().toString();
@@ -75,11 +78,24 @@ class Downloader extends EventEmitter {
      */
     unfinishedTasks: DownloadTask[] = [];
 
-    constructor({ threads, headers, output, ascending, concat, timeout, verbose, logger }: Partial<DownloaderOptions>) {
+    constructor({
+        threads,
+        retries,
+        headers,
+        output,
+        ascending,
+        concat,
+        timeout,
+        verbose,
+        logger,
+    }: Partial<DownloaderOptions>) {
         super();
         this.logger = logger || new ConsoleLogger();
         if (threads) {
             this.threads = threads;
+        }
+        if (retries) {
+            this.retries = retries;
         }
         if (timeout) {
             this.timeout = timeout;
@@ -262,6 +278,12 @@ class Downloader extends EventEmitter {
 
         const scheduler = new TaskScheduler<DownloadTask>({
             threads: this.threads,
+            taskErrorHandler: (error, task) => {
+                if (task.retryCount > this.retries) {
+                    return TaskFailDecision.DROP;
+                }
+                return TaskFailDecision.RETRY;
+            },
         });
         scheduler.addTasks(
             this.tasks.map((task) => ({
@@ -280,7 +302,9 @@ class Downloader extends EventEmitter {
         });
         scheduler.on("task-error", ({ task, error: e, decision }: TaskErrorEvent<DownloadTask, any>) => {
             this.logger.warning(
-                `Download ${task.payload.url} failed, retry later. [${
+                `Download ${task.payload.url} failed, ${
+                    decision === TaskFailDecision.DROP ? "max retries exceed, drop." : "retry later."
+                } [${
                     e.code ||
                     (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
                     e.message ||

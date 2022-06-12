@@ -1,8 +1,9 @@
 import * as crypto from "crypto";
 import { EventEmitter } from "events";
 
-interface SchedulerOptions {
+interface SchedulerOptions<T> {
     threads: number;
+    taskErrorHandler?: (err: Error, task: SchedulerTask<T>) => TaskFailDecision;
 }
 
 interface Task<T> {
@@ -12,7 +13,7 @@ interface Task<T> {
 
 export interface SchedulerTask<T = Record<string, unknown>> extends Task<T> {
     priority: number;
-    retry: number;
+    retryCount: number;
     uuid: string;
 }
 
@@ -29,7 +30,7 @@ export interface TaskErrorEvent<T, E = Error> {
     decision: TaskFailDecision;
 }
 
-enum TaskFailDecision {
+export enum TaskFailDecision {
     RETRY,
     DROP,
     INCREASE_PRIORITY,
@@ -48,11 +49,14 @@ class TaskScheduler<T> extends EventEmitter {
 
     private dropCount = 0;
 
-    private taskErrorHandler: (err: Error, task: Task<T>) => TaskFailDecision = () => TaskFailDecision.RETRY;
+    private taskErrorHandler: (err: Error, task: SchedulerTask<T>) => TaskFailDecision = () => TaskFailDecision.RETRY;
 
-    constructor(options: SchedulerOptions) {
+    constructor(options: SchedulerOptions<T>) {
         super();
         this.threads = options.threads;
+        if (options.taskErrorHandler) {
+            this.taskErrorHandler = options.taskErrorHandler;
+        }
     }
 
     get isQueueEmpty(): boolean {
@@ -81,7 +85,6 @@ class TaskScheduler<T> extends EventEmitter {
             this.nowRunningThreadsCount++;
             this.runTask(currentTask)
                 .then(() => {
-                    this.nowRunningThreadsCount--;
                     this.finishCount++;
                     this.emit("task-finish", {
                         task: currentTask,
@@ -101,18 +104,19 @@ class TaskScheduler<T> extends EventEmitter {
                             }
                             case TaskFailDecision.INCREASE_PRIORITY: {
                                 currentTask.priority++;
-                                currentTask.retry++;
+                                currentTask.retryCount++;
                                 this.addTasks(currentTask);
                                 break;
                             }
                             default: {
-                                currentTask.retry++;
+                                currentTask.retryCount++;
                                 this.addTasks(currentTask);
                             }
                         }
                     }
                 })
                 .finally(() => {
+                    this.nowRunningThreadsCount--;
                     this.checkQueue();
                 });
             this.checkQueue();
@@ -138,9 +142,11 @@ class TaskScheduler<T> extends EventEmitter {
 
     public addTasks(tasks: Task<T> | Task<T>[]): void {
         if (Array.isArray(tasks)) {
-            this.tasks.push(...tasks.map((task) => ({ ...task, uuid: crypto.randomUUID(), retry: 0, priority: 1 })));
+            this.tasks.push(
+                ...tasks.map((task) => ({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...task }))
+            );
         } else {
-            this.tasks.push({ ...tasks, uuid: crypto.randomUUID(), retry: 0, priority: 1 });
+            this.tasks.push({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...tasks });
         }
     }
 

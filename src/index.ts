@@ -118,6 +118,15 @@ Erii.addOption({
 });
 
 Erii.addOption({
+    name: ["retries", "r"],
+    description: "Max attempts for download tasks",
+    argument: {
+        name: "limit",
+        description: "(Optional) Max attempts of tasks, defaults to 5",
+    },
+});
+
+Erii.addOption({
     name: "timeout",
     description: "Timeout threshold for each segment.",
     argument: {
