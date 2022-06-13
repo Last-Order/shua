@@ -107,6 +107,71 @@ Use
 shua -f a.txt --threads 16
 ```
 
+## Options
+
+### `--file, -f <path>`
+
+Download all URLs containing in a file. Both local path and remote URLs are supported as import. Lines couldn't be parsed as an valid URL will be ignored by default.
+
+#### Examples
+
+```bash
+shua -f "files.txt"
+shua -f "https://example.com/file_list.txt"
+```
+
+### `--expression, -e <expression>`
+
+Download all URLs generated from a expression. See `Expressions` section above.
+
+### `--json, -j <path>`
+
+Download tasks defined in a json file. JSON files should contain a `DownloadTask` array.
+
+```TypeScript
+interface DownloadTask {
+    /** URL */
+    url: string;
+    /** retry count */
+    retryCount: number;
+    /** output filename */
+    filename?: string;
+    /** custom HTTP headers */
+    headers?: Record<string, string>;
+}
+type Tasks = DownloadTask[];
+```
+
+### `--threads <limit>`
+
+Threads limit.
+
+### `--retries, -r <limit>`
+
+Max attempts for download tasks.
+
+### `--timeout <threshold>`
+
+Timeout threshold for download tasks in milliseconds.
+
+### `--concat, -c`
+
+Concatenate all downloaded files into a single output file.
+
+### `--output, -o <name>`
+
+Output folder name.
+
+Nested paths are not supported now.
+
+### `--ascending, -a`
+
+Rename output files in numerical ascending order.
+
+### `--debug, --verbose`
+
+Enable debug log output.
+
 ## Use as a library
 
 ### Getting Started
@@ -126,7 +191,7 @@ downloader.start();
 
 | Event Name    | Parameters                                  |
 | ------------- | ------------------------------------------- |
-| `progress`    | `finishedCount: number, totalCOunt: number` |
+| `progress`    | `finishedCount: number, totalCount: number` |
 | `task-finish` | `task: Task`                                |
 | `task-error`  | `err: Error, task: Task`                    |
 | `finish`      |                                             |
