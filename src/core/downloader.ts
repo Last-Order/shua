@@ -36,8 +36,10 @@ export interface DownloadTask {
     url: string;
     /** 重试计数 */
     retryCount: number;
+    /** 顺序编号 */
+    index: number;
     /** 输出文件名 */
-    filename?: string;
+    filename: string;
     /** 自定义 Headers */
     headers?: Record<string, string>;
 }
@@ -134,6 +136,16 @@ class Downloader extends EventEmitter {
         }
     }
 
+    onChunkNaming(task: Omit<DownloadTask, "filename">): string {
+        if (this.ascending) {
+            const ext = getFileExt(task.url);
+            return task.index.toString().padStart(8, "0") + (ext ? `.${ext}` : "");
+        }
+        const filename = new URL(task.url).pathname.slice(1);
+        const p = filename.split("/");
+        return p[p.length - 1];
+    }
+
     /**
      * 从文件添加下载文件 URL
      * @param path 文件路径
@@ -158,26 +170,28 @@ class Downloader extends EventEmitter {
             .split("\n")
             .map((line) => line.trim())
             .filter((line) => !!line);
-        for (const line of lines) {
+        let counter = 0;
+        for (const index in lines) {
             let url;
-            if (line.startsWith("#")) {
+            if (lines[index].startsWith("#")) {
                 continue;
             }
-            if (line.startsWith("http://") || line.startsWith("https://")) {
-                url = line;
+            if (lines[index].startsWith("http://") || lines[index].startsWith("https://")) {
+                url = lines[index];
             } else if (isLoadFromRemote) {
                 try {
-                    url = new URL(line, path).href;
+                    url = new URL(lines[index], path).href;
                 } catch (e) {
                     // ignore
                 }
             }
             if (url) {
-                tasks.push({ url, retryCount: 0 });
+                counter++;
+                const newTask = { url, retryCount: 0, index: counter };
+                tasks.push({ ...newTask, filename: this.onChunkNaming(newTask) });
             }
         }
         this.tasks.push(...tasks);
-        this.checkAscending();
     }
 
     /**
@@ -187,14 +201,18 @@ class Downloader extends EventEmitter {
     loadUrlsFromExpression(expression: string) {
         const expressionParser = new ExpressionParser(expression);
         this.tasks.push(
-            ...expressionParser.getUrls().map((url) => {
-                return {
+            ...expressionParser.getUrls().map((url, index) => {
+                const newTask = {
                     url,
                     retryCount: 0,
+                    index,
+                };
+                return {
+                    ...newTask,
+                    filename: this.onChunkNaming(newTask),
                 };
             })
         );
-        this.checkAscending();
     }
 
     /**
@@ -203,14 +221,15 @@ class Downloader extends EventEmitter {
      */
     loadUrlsFromArray(urls: string[]) {
         this.tasks.push(
-            ...urls.map((url) => {
-                return {
+            ...urls.map((url, index) => {
+                const newTask = {
                     url,
                     retryCount: 0,
+                    index,
                 };
+                return { ...newTask, filename: this.onChunkNaming(newTask) };
             })
         );
-        this.checkAscending();
     }
 
     /**
@@ -232,20 +251,6 @@ class Downloader extends EventEmitter {
                 retryCount: 0,
             }))
         );
-        this.checkAscending();
-    }
-
-    checkAscending() {
-        if (this.ascending) {
-            // 增序重命名文件
-            const maxLength = this.tasks.length.toString().length;
-            let counter = 0;
-            for (const task of this.tasks) {
-                const ext = getFileExt(task.url);
-                task.filename = counter.toString().padStart(maxLength, "0") + (ext ? `.${ext}` : "");
-                counter++;
-            }
-        }
     }
 
     /**
@@ -289,6 +294,7 @@ class Downloader extends EventEmitter {
             this.tasks.map((task) => ({
                 handler: this.handleTask.bind(this),
                 payload: task,
+                priority: -task.index, // 默认以添加顺
             }))
         );
         scheduler.on("task-finish", ({ task, finishCount }: TaskFinishEvent<DownloadTask>) => {
@@ -320,25 +326,19 @@ class Downloader extends EventEmitter {
     }
 
     async handleTask(task: DownloadTask) {
-        const filename = new URL(task.url).pathname.slice(1);
-        const p = filename.split("/");
-        return await downloadFile(
-            task.url,
-            path.resolve(this.output, task.filename !== undefined ? task.filename : p[p.length - 1]),
-            {
-                ...(task.headers
-                    ? {
-                          headers: {
-                              ...this.headers,
-                              ...task.headers,
-                          },
-                      }
-                    : {
-                          headers: { ...this.headers },
-                      }),
-                timeout: this.timeout,
-            }
-        );
+        return await downloadFile(task.url, path.resolve(this.output, task.filename), {
+            ...(task.headers
+                ? {
+                      headers: {
+                          ...this.headers,
+                          ...task.headers,
+                      },
+                  }
+                : {
+                      headers: { ...this.headers },
+                  }),
+            timeout: this.timeout,
+        });
     }
 
     async beforeFinish() {
