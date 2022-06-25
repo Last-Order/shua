@@ -51,7 +51,13 @@ class PriorityQueue<T extends { priority: number }> {
         this.shiftUp(this.size - 1);
     }
 
-    public pop(): T {
+    public insertMulti(items: T[]): void {
+        for (const item of items) {
+            this.insert(item);
+        }
+    }
+
+    public getMaxPriorityItem(): T {
         const result = this.heap[0];
         this.heap[0] = this.heap[this.size - 1];
         this.heap.pop();

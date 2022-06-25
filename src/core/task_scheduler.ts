@@ -1,8 +1,10 @@
 import * as crypto from "crypto";
 import { EventEmitter } from "events";
+import PriorityQueue from "../utils/priority_queue";
 
 interface SchedulerOptions<T> {
     threads: number;
+    autoStop?: boolean;
     taskErrorHandler?: (err: Error, task: SchedulerTask<T>) => TaskFailDecision;
 }
 
@@ -30,14 +32,18 @@ export interface TaskErrorEvent<T, E = Error> {
     decision: TaskFailDecision;
 }
 
+/** 任务失败决策 */
 export enum TaskFailDecision {
+    /** 重试 */
     RETRY,
+    /** 放弃 */
     DROP,
+    /** 提升优先级并重试 */
     INCREASE_PRIORITY,
 }
 
 class TaskScheduler<T> extends EventEmitter {
-    private tasks: SchedulerTask<T>[] = [];
+    private queue: PriorityQueue<SchedulerTask<T>>;
 
     private nowRunningThreadsCount = 0;
 
@@ -49,22 +55,22 @@ class TaskScheduler<T> extends EventEmitter {
 
     private dropCount = 0;
 
+    private totalCount = 0;
+
     private taskErrorHandler: (err: Error, task: SchedulerTask<T>) => TaskFailDecision = () => TaskFailDecision.RETRY;
 
     constructor(options: SchedulerOptions<T>) {
         super();
         this.threads = options.threads;
+        this.queue = new PriorityQueue<SchedulerTask<T>>();
+
         if (options.taskErrorHandler) {
             this.taskErrorHandler = options.taskErrorHandler;
         }
     }
 
     get isQueueEmpty(): boolean {
-        return this.tasks.length === 0;
-    }
-
-    get totalCount(): number {
-        return this.tasks.length;
+        return this.queue.size === 0;
     }
 
     private async checkQueue(): Promise<void> {
@@ -130,10 +136,10 @@ class TaskScheduler<T> extends EventEmitter {
         if (this.nowRunningThreadsCount > this.threads) {
             return;
         }
-        if (this.tasks.length === 0) {
+        if (this.isQueueEmpty) {
             return;
         }
-        return this.tasks.shift();
+        return this.queue.getMaxPriorityItem();
     }
 
     private async runTask(task: Task<T>): Promise<void> {
@@ -142,11 +148,13 @@ class TaskScheduler<T> extends EventEmitter {
 
     public addTasks(tasks: Task<T> | Task<T>[]): void {
         if (Array.isArray(tasks)) {
-            this.tasks.push(
-                ...tasks.map((task) => ({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...task }))
+            this.queue.insertMulti(
+                tasks.map((task) => ({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...task }))
             );
+            this.totalCount += tasks.length;
         } else {
-            this.tasks.push({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...tasks });
+            this.queue.insert({ uuid: crypto.randomUUID(), retryCount: 0, priority: 1, ...tasks });
+            this.totalCount += 1;
         }
     }
 
@@ -155,7 +163,7 @@ class TaskScheduler<T> extends EventEmitter {
     }
 
     public waitAllFinished(): Promise<void> {
-        if (this.nowRunningThreadsCount === 0 && this.tasks.length == 0) {
+        if (this.nowRunningThreadsCount === 0 && this.isQueueEmpty) {
             return Promise.resolve();
         }
         return new Promise((resolve) => {
