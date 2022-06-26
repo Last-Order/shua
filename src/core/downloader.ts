@@ -68,6 +68,8 @@ class Downloader extends EventEmitter {
     totalCount: number;
     /** 已完成任务数 */
     finishCount: number = 0;
+    /** 放弃任务数 */
+    dropCount: number = 0;
     startTime: Date;
     isEnd: boolean = false;
     /**
@@ -280,7 +282,6 @@ class Downloader extends EventEmitter {
         if (!fs.existsSync(this.output)) {
             fs.mkdirSync(this.output);
         }
-
         const scheduler = new TaskScheduler<DownloadTask>({
             threads: this.threads,
             taskErrorHandler: (error, task) => {
@@ -321,6 +322,9 @@ class Downloader extends EventEmitter {
             this.logger.debug(e.request);
             this.emit("task-error", e, task);
         });
+        scheduler.on("task-drop", () => {
+            this.dropCount++;
+        });
         scheduler.once("finish", this.beforeFinish.bind(this));
         scheduler.start();
     }
@@ -352,6 +356,9 @@ class Downloader extends EventEmitter {
             this.logger.info(`All finished. Please checkout your files at [${outputPath}]`);
         } else {
             this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
+        }
+        if (this.dropCount > 0) {
+            this.logger.warning(`${this.dropCount} files are dropped due to unrecoverable errors.`);
         }
         this.emit("finish");
     }

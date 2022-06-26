@@ -106,6 +106,12 @@ class TaskScheduler<T> extends EventEmitter {
                         switch (decision) {
                             case TaskFailDecision.DROP: {
                                 this.dropCount++;
+                                this.emit("task-drop", {
+                                    task: currentTask,
+                                    finishCount: this.finishCount,
+                                    dropCount: this.dropCount,
+                                    totalCount: this.totalCount,
+                                });
                                 break;
                             }
                             case TaskFailDecision.INCREASE_PRIORITY: {
