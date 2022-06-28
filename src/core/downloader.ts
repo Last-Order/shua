@@ -2,11 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { URL } from "url";
 import { EventEmitter } from "events";
-import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
 import ExpressionParser from "./expression_parser";
+import TaskScheduler, { SchedulerTask, TaskErrorEvent, TaskFailDecision, TaskFinishEvent } from "./task_scheduler";
+import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
 import { ConsoleLogger, Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
-import TaskScheduler, { TaskErrorEvent, TaskFailDecision, TaskFinishEvent } from "./task_scheduler";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -28,14 +28,16 @@ export interface DownloaderOptions {
     /** 自定义 Logger */
     logger?: Logger;
 }
+
+export interface UrlTask {
+    /** URL */
+    url: string;
+}
+
 /**
  * 下载任务结构
  */
-export interface DownloadTask {
-    /** URL */
-    url: string;
-    /** 重试计数 */
-    retryCount: number;
+export interface DownloadTask extends UrlTask {
     /** 顺序编号 */
     index: number;
     /** 输出文件名 */
@@ -77,10 +79,8 @@ class Downloader extends EventEmitter {
      * 开始后不修改
      */
     tasks: DownloadTask[] = [];
-    /**
-     * 未完成的任务
-     */
-    unfinishedTasks: DownloadTask[] = [];
+
+    scheduler: TaskScheduler<DownloadTask>;
 
     constructor({
         threads,
@@ -136,6 +136,7 @@ class Downloader extends EventEmitter {
             this.verbose = verbose;
             this.logger.enableDebug();
         }
+        this.setupTaskScheduler();
     }
 
     onChunkNaming(task: Omit<DownloadTask, "filename">): string {
@@ -167,12 +168,11 @@ class Downloader extends EventEmitter {
         } else {
             text = fs.readFileSync(path).toString();
         }
-        const tasks: DownloadTask[] = [];
+        const tasks: UrlTask[] = [];
         const lines = text
             .split("\n")
             .map((line) => line.trim())
             .filter((line) => !!line);
-        let counter = 0;
         for (const index in lines) {
             let url;
             if (lines[index].startsWith("#")) {
@@ -188,12 +188,10 @@ class Downloader extends EventEmitter {
                 }
             }
             if (url) {
-                counter++;
-                const newTask = { url, retryCount: 0, index: counter };
-                tasks.push({ ...newTask, filename: this.onChunkNaming(newTask) });
+                tasks.push({ url });
             }
         }
-        this.tasks.push(...tasks);
+        this.addTasks(tasks);
     }
 
     /**
@@ -202,19 +200,7 @@ class Downloader extends EventEmitter {
      */
     loadUrlsFromExpression(expression: string) {
         const expressionParser = new ExpressionParser(expression);
-        this.tasks.push(
-            ...expressionParser.getUrls().map((url, index) => {
-                const newTask = {
-                    url,
-                    retryCount: 0,
-                    index,
-                };
-                return {
-                    ...newTask,
-                    filename: this.onChunkNaming(newTask),
-                };
-            })
-        );
+        this.addTasks(expressionParser.getUrls().map((url) => ({ url })));
     }
 
     /**
@@ -222,16 +208,7 @@ class Downloader extends EventEmitter {
      * @param urls URL数组
      */
     loadUrlsFromArray(urls: string[]) {
-        this.tasks.push(
-            ...urls.map((url, index) => {
-                const newTask = {
-                    url,
-                    retryCount: 0,
-                    index,
-                };
-                return { ...newTask, filename: this.onChunkNaming(newTask) };
-            })
-        );
+        this.addTasks(urls.map((url) => ({ url })));
     }
 
     /**
@@ -247,41 +224,10 @@ class Downloader extends EventEmitter {
         if (tasks.some((task) => !task.url)) {
             throw new JSONParseError(`Missing URL for tasks in JSON file.`);
         }
-        this.tasks.push(
-            ...tasks.map((task) => ({
-                ...task,
-                retryCount: 0,
-            }))
-        );
+        this.addTasks(tasks);
     }
 
-    /**
-     * 开始下载
-     */
-    start() {
-        this.startTime = new Date();
-        this.unfinishedTasks = [...this.tasks];
-        this.totalCount = this.tasks.length;
-
-        if (process.platform === "win32") {
-            const rl = require("readline").createInterface({
-                input: process.stdin,
-                output: process.stdout,
-            });
-
-            rl.on("SIGINT", function () {
-                // @ts-ignore
-                process.emit("SIGINT");
-            });
-        }
-
-        process.on("SIGINT", () => {
-            process.exit();
-        });
-
-        if (!fs.existsSync(this.output)) {
-            fs.mkdirSync(this.output);
-        }
+    setupTaskScheduler() {
         const scheduler = new TaskScheduler<DownloadTask>({
             threads: this.threads,
             taskErrorHandler: (error, task) => {
@@ -291,13 +237,6 @@ class Downloader extends EventEmitter {
                 return TaskFailDecision.RETRY;
             },
         });
-        scheduler.addTasks(
-            this.tasks.map((task) => ({
-                handler: this.handleTask.bind(this),
-                payload: task,
-                priority: -task.index, // 默认以添加顺
-            }))
-        );
         scheduler.on("task-finish", ({ task, finishCount }: TaskFinishEvent<DownloadTask>) => {
             this.finishCount++;
             this.logger.info(
@@ -326,7 +265,65 @@ class Downloader extends EventEmitter {
             this.dropCount++;
         });
         scheduler.once("finish", this.beforeFinish.bind(this));
-        scheduler.start();
+        this.scheduler = scheduler;
+    }
+
+    addTasks(tasks: UrlTask[]) {
+        this.scheduler.addTasks(
+            tasks.map<Omit<SchedulerTask<DownloadTask>, "uuid">>((task, index) => ({
+                handler: this.handleTask.bind(this),
+                payload: {
+                    ...task,
+                    index: this.totalCount + index,
+                    filename: this.onChunkNaming({
+                        url: task.url,
+                        index: this.totalCount + index,
+                    }),
+                },
+                retryCount: 0,
+                priority: -(this.totalCount + index), // 默认以添加顺
+            }))
+        );
+        this.tasks.push(
+            ...tasks.map((task, index) => ({
+                ...task,
+                index: this.totalCount + index,
+                filename: this.onChunkNaming({
+                    url: task.url,
+                    index: this.totalCount + index,
+                }),
+            }))
+        );
+        this.totalCount += tasks.length;
+    }
+
+    /**
+     * 开始下载
+     */
+    start() {
+        this.startTime = new Date();
+
+        if (process.platform === "win32") {
+            const rl = require("readline").createInterface({
+                input: process.stdin,
+                output: process.stdout,
+            });
+
+            rl.on("SIGINT", function () {
+                // @ts-ignore
+                process.emit("SIGINT");
+            });
+        }
+
+        process.on("SIGINT", () => {
+            process.exit();
+        });
+
+        if (!fs.existsSync(this.output)) {
+            fs.mkdirSync(this.output);
+        }
+
+        this.scheduler.start();
     }
 
     async handleTask(task: DownloadTask) {
