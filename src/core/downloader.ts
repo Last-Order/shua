@@ -3,10 +3,18 @@ import * as path from "path";
 import { URL } from "url";
 import { EventEmitter } from "events";
 import ExpressionParser from "./expression_parser";
-import TaskScheduler, { SchedulerTask, TaskErrorEvent, TaskFailDecision, TaskFinishEvent } from "./task_scheduler";
+import TaskScheduler, {
+    SchedulerTask,
+    TaskDropEvent,
+    TaskErrorEvent,
+    TaskFailDecision,
+    TaskFinishEvent,
+} from "./task_scheduler";
 import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
 import { ConsoleLogger, Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
+import { TaskStatus } from "../types";
+import FileConcentrator from "./file_concentrator";
 
 export interface DownloaderOptions {
     /** 并发数量 */
@@ -67,7 +75,7 @@ class Downloader extends EventEmitter {
     /** 当前运行并发数量 */
     nowRunningThreadsCount: number = 0;
     /** 全部任务数 */
-    totalCount: number;
+    totalCount: number = 0;
     /** 已完成任务数 */
     finishCount: number = 0;
     /** 放弃任务数 */
@@ -80,7 +88,11 @@ class Downloader extends EventEmitter {
      */
     tasks: DownloadTask[] = [];
 
+    taskStatusRecord: TaskStatus[] = [];
+
     scheduler: TaskScheduler<DownloadTask>;
+
+    fileConcentrator: FileConcentrator;
 
     constructor({
         threads,
@@ -160,7 +172,7 @@ class Downloader extends EventEmitter {
             try {
                 this.logger.debug(`Load file from ${path}`);
                 isLoadFromRemote = true;
-                text = await loadRemoteFile(path);
+                text = await loadRemoteFile(path, { headers: this.headers });
                 this.logger.info(`Load file from ${path} success.`);
             } catch (e) {
                 throw new LoadRemoteFileError(`Load remote file failed.`);
@@ -238,7 +250,16 @@ class Downloader extends EventEmitter {
             },
         });
         scheduler.on("task-finish", ({ task, finishCount }: TaskFinishEvent<DownloadTask>) => {
+            this.taskStatusRecord[task.payload.index] = TaskStatus.DONE;
             this.finishCount++;
+            if (this.concat) {
+                this.fileConcentrator.addTasks([
+                    {
+                        filePath: path.resolve(this.output, task.payload.filename),
+                        index: task.payload.index,
+                    },
+                ]);
+            }
             this.logger.info(
                 `${this.finishCount} / ${this.totalCount} or ${((this.finishCount / this.totalCount) * 100).toFixed(
                     2
@@ -261,7 +282,8 @@ class Downloader extends EventEmitter {
             this.logger.debug(e.request);
             this.emit("task-error", e, task);
         });
-        scheduler.on("task-drop", () => {
+        scheduler.on("task-drop", ({ task }: TaskDropEvent<DownloadTask, any>) => {
+            this.taskStatusRecord[task.payload.index] = TaskStatus.DROPPED;
             this.dropCount++;
         });
         scheduler.once("finish", this.beforeFinish.bind(this));
@@ -284,16 +306,20 @@ class Downloader extends EventEmitter {
                 priority: -(this.totalCount + index), // 默认以添加顺
             }))
         );
-        this.tasks.push(
-            ...tasks.map((task, index) => ({
+        for (const index in tasks) {
+            const task = tasks[index];
+            const taskIndex = this.totalCount + +index;
+            const newTask = {
                 ...task,
-                index: this.totalCount + index,
+                index: taskIndex,
                 filename: this.onChunkNaming({
                     url: task.url,
-                    index: this.totalCount + index,
+                    index: taskIndex,
                 }),
-            }))
-        );
+            };
+            this.tasks.push(newTask);
+            this.taskStatusRecord[taskIndex] = TaskStatus.PENDING;
+        }
         this.totalCount += tasks.length;
     }
 
@@ -301,8 +327,10 @@ class Downloader extends EventEmitter {
      * 开始下载
      */
     start() {
+        if (this.tasks.length === 0) {
+            return;
+        }
         this.startTime = new Date();
-
         if (process.platform === "win32") {
             const rl = require("readline").createInterface({
                 input: process.stdin,
@@ -321,6 +349,15 @@ class Downloader extends EventEmitter {
 
         if (!fs.existsSync(this.output)) {
             fs.mkdirSync(this.output);
+        }
+
+        if (this.concat) {
+            const ext = getFileExt(this.tasks[0].url);
+            this.fileConcentrator = new FileConcentrator({
+                outputPath: path.resolve(this.output, `_shua_concat_${Date.now()}${ext ? `.${ext}` : ""}`),
+                taskStatusRecord: this.taskStatusRecord,
+                deleteAfterWritten: true,
+            });
         }
 
         this.scheduler.start();
@@ -344,12 +381,8 @@ class Downloader extends EventEmitter {
 
     async beforeFinish() {
         if (this.concat) {
-            const ext = getFileExt(this.tasks[0].filename);
-            const outputPath = path.resolve(this.output, `_shua_result${ext ? `.${ext}` : ""}`);
-            await concat(
-                this.tasks.map((t) => path.resolve(this.output, t.filename)),
-                outputPath
-            );
+            const outputPath = this.fileConcentrator.getOutputPath();
+            await this.fileConcentrator.waitAllFilesWritten();
             this.logger.info(`All finished. Please checkout your files at [${outputPath}]`);
         } else {
             this.logger.info(`All finished. Please checkout your files at [${this.output}]`);

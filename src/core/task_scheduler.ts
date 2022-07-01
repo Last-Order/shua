@@ -32,6 +32,11 @@ export interface TaskErrorEvent<T, E = Error> {
     decision: TaskFailDecision;
 }
 
+export interface TaskDropEvent<T, E = Error> {
+    task: SchedulerTask<T>;
+    error: E;
+}
+
 /** 任务失败决策 */
 export enum TaskFailDecision {
     /** 重试 */
@@ -108,10 +113,11 @@ class TaskScheduler<T> extends EventEmitter {
                                 this.dropCount++;
                                 this.emit("task-drop", {
                                     task: currentTask,
+                                    error: e,
                                     finishCount: this.finishCount,
                                     dropCount: this.dropCount,
                                     totalCount: this.totalCount,
-                                });
+                                } as TaskDropEvent<T>);
                                 break;
                             }
                             case TaskFailDecision.INCREASE_PRIORITY: {
