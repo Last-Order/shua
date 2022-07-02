@@ -12,36 +12,6 @@ npm install -g shua
 
 Note: Shua needs Node.js 12.0.0+.
 
-## Usage
-
-```
-Shua / A lovely downloader / 1.0.7
-
-Help:
-     Commands                      Description                   Alias
-
-     --help <command>              Show help documentation       --h
-         <command>                 Show help
-     --file <input_path>           Download urls in a file       --f
-         <input_path>              file path
-     --expression <expression>     Download urls from a expressio--e
-         <expression>              Url expression
-     --clean                       [DEBUG ONLY DO NOT USE]
-
-Options:
-
-     Options                       Description
-     --headers <headers>           Custom HTTP headers
-         <headers>                 (Optional) Custom HTTP headers.
-     --threads <limit>             Threads limit
-         <limit>                   (Optional) Limit of threads, defaults to 8
-     --timeout <limit>             Timeout threshold for each segment.
-         <limit>                   (Optional) Timeout threshold in ms, defaults to 30000
-     --output, o <path>            Set output direcotry
-         <path>                    (Optional) Output files path
-     --ascending                   Rename output files numerical ascendingly
-```
-
 ## Expressions
 
 Shua supports generating urls from a url expression.
