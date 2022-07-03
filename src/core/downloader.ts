@@ -64,6 +64,7 @@ class Downloader extends EventEmitter {
     timeout: number = 30000;
     headers: Record<string, unknown> = {};
     output: string = "./shua_download_" + new Date().valueOf().toString();
+    concatOutput: string;
     ascending: boolean = false;
     concat: boolean = false;
     verbose: boolean = false;
@@ -132,17 +133,24 @@ class Downloader extends EventEmitter {
                 }
             }
         }
-        if (output) {
-            if (!fs.existsSync(output)) {
-                throw new Error(`Output path is not exist.`);
-            }
-            this.output = output;
-        }
         if (ascending) {
             this.ascending = ascending;
         }
         if (concat) {
             this.concat = concat;
+        }
+        if (output) {
+            if (this.concat) {
+                if (fs.existsSync(output)) {
+                    throw new Error("Output path already exists. Please use a different path.");
+                }
+                this.concatOutput = output;
+            } else {
+                this.output = output;
+                if (path.extname(output)) {
+                    this.logger.warning("Please use a directory name as the output path.");
+                }
+            }
         }
         if (verbose) {
             this.verbose = verbose;
@@ -354,7 +362,8 @@ class Downloader extends EventEmitter {
         if (this.concat) {
             const ext = getFileExt(this.tasks[0].url);
             this.fileConcentrator = new FileConcentrator({
-                outputPath: path.resolve(this.output, `_shua_concat_${Date.now()}${ext ? `.${ext}` : ""}`),
+                outputPath:
+                    this.concatOutput || path.resolve(this.output, `_shua_concat_${Date.now()}${ext ? `.${ext}` : ""}`),
                 taskStatusRecord: this.taskStatusRecord,
                 deleteAfterWritten: true,
             });
@@ -381,11 +390,13 @@ class Downloader extends EventEmitter {
 
     async beforeFinish() {
         if (this.concat) {
+            this.logger.info("Please wait...");
             const outputPath = this.fileConcentrator.getOutputPath();
             await this.fileConcentrator.waitAllFilesWritten();
-            this.logger.info(`All finished. Please checkout your files at [${outputPath}]`);
+            fs.rmdirSync(this.output);
+            this.logger.info(`All finished. Please checkout your files at [${path.resolve(outputPath)}]`);
         } else {
-            this.logger.info(`All finished. Please checkout your files at [${this.output}]`);
+            this.logger.info(`All finished. Please checkout your files at [${path.resolve(this.output)}]`);
         }
         if (this.dropCount > 0) {
             this.logger.warning(`${this.dropCount} files are dropped due to unrecoverable errors.`);
