@@ -8,19 +8,19 @@ export abstract class Logger {
 
 export class ConsoleLogger extends Logger {
     debugFlag = false;
-    debug(message: string) {
+    debug(message: any) {
         if (!this.debugFlag) {
             return;
         }
-        console.debug(`${message}`);
+        console.debug(message);
     }
 
-    info(message: string) {
-        console.info(`${message}`);
+    info(message: any) {
+        console.info(message);
     }
 
-    warning(message: string) {
-        console.warn(`${message}`);
+    warning(message: any) {
+        console.warn(message);
     }
 
     error(message: string, error?: Error) {

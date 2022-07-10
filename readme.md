@@ -124,7 +124,7 @@ Max attempts for download tasks.
 
 Timeout threshold for download tasks in milliseconds.
 
-### `--concat, -c`
+### `--concat, -c` (3.0.0+)
 
 Concatenate all downloaded files into a single output file.
 
@@ -133,6 +133,8 @@ Concatenate all downloaded files into a single output file.
 Output folder name.
 
 Nested paths are not supported now.
+
+if `--concat` is provided, `--output` will be used for concentration.
 
 ### `--ascending, -a`
 

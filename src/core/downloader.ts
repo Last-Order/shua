@@ -276,18 +276,19 @@ class Downloader extends EventEmitter {
             this.emit("progress", this.finishCount, this.totalCount);
         });
         scheduler.on("task-error", ({ task, error: e, decision }: TaskErrorEvent<DownloadTask, any>) => {
+            console.log(e.code)
             this.logger.warning(
                 `Download ${task.payload.url} failed, ${
                     decision === TaskFailDecision.DROP ? "max retries exceed, drop." : "retry later."
                 } [${
-                    e.code ||
                     (e.response ? `${e.response.status} ${e.response.statusText}` : undefined) ||
+                    e.code ||
                     e.message ||
                     e.constructor.name ||
                     "UNKNOWN"
                 }]`
             );
-            this.logger.debug(e.request);
+            this.logger.debug(e);
             this.emit("task-error", e, task);
         });
         scheduler.on("task-drop", ({ task }: TaskDropEvent<DownloadTask, any>) => {
@@ -299,6 +300,7 @@ class Downloader extends EventEmitter {
     }
 
     addTasks(tasks: UrlTask[]) {
+        this.logger.info(`${tasks.length} tasks added.`);
         this.scheduler.addTasks(
             tasks.map<Omit<SchedulerTask<DownloadTask>, "uuid">>((task, index) => ({
                 handler: this.handleTask.bind(this),
