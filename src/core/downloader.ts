@@ -276,7 +276,6 @@ class Downloader extends EventEmitter {
             this.emit("progress", this.finishCount, this.totalCount);
         });
         scheduler.on("task-error", ({ task, error: e, decision }: TaskErrorEvent<DownloadTask, any>) => {
-            console.log(e.code)
             this.logger.warning(
                 `Download ${task.payload.url} failed, ${
                     decision === TaskFailDecision.DROP ? "max retries exceed, drop." : "retry later."
