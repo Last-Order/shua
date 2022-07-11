@@ -98,12 +98,9 @@ class FileConcentrator {
     }
 
     public async waitAllFilesWritten() {
-        if (this.isCheckingWritableFiles) {
-            while (this.isCheckingWritableFiles) {
-                await sleep(200);
-            }
+        while (this.isCheckingWritableFiles) {
+            await sleep(200);
         }
-        await this.checkWritableTasks();
     }
 
     public getOutputPath(): string {
