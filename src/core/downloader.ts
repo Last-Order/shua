@@ -290,7 +290,7 @@ class Downloader extends EventEmitter {
             this.logger.debug(e);
             this.emit("task-error", e, task);
         });
-        scheduler.on("task-drop", ({ task }: TaskDropEvent<DownloadTask, any>) => { 
+        scheduler.on("task-drop", ({ task }: TaskDropEvent<DownloadTask, any>) => {
             this.taskStatusRecord[task.payload.index] = TaskStatus.DROPPED;
             this.dropCount++;
         });
@@ -392,9 +392,17 @@ class Downloader extends EventEmitter {
     async beforeFinish() {
         if (this.concat) {
             this.logger.info("Please wait...");
-            const outputPath = this.fileConcentrator.getOutputPath();
             await this.fileConcentrator.waitAllFilesWritten();
-            this.logger.info(`All finished. Please checkout your files at [${path.resolve(outputPath)}]`);
+            const outputPaths = this.fileConcentrator.getOutputFilePaths();
+            if (outputPaths.length === 1) {
+                this.logger.info(`All finished. Please checkout your files at [${path.resolve(outputPaths[0])}]`);
+            } else {
+                this.logger.info(
+                    `All finished. Please checkout your files at ${outputPaths
+                        .map((p) => `[${path.resolve(p)}]`)
+                        .join(", ")}.`
+                );
+            }
         } else {
             this.logger.info(`All finished. Please checkout your files at [${path.resolve(this.output)}]`);
         }

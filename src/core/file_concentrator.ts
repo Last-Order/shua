@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import { TaskStatus } from "../types";
+import { getFileExt } from "../utils/file";
 import { sleep } from "../utils/helper";
 
 interface FileConcentratorParams {
@@ -18,11 +19,15 @@ class FileConcentrator {
 
     tasks: ConcentrationTask[] = [];
 
-    outputPath: string;
+    outputFilename: string;
+
+    outputFileExt: string;
 
     writeStream: fs.WriteStream;
 
     lastFinishIndex: number = -1;
+
+    writeSequence: number = 0;
 
     isCheckingWritableFiles = false;
 
@@ -30,11 +35,33 @@ class FileConcentrator {
 
     constructor({ taskStatusRecord, outputPath, deleteAfterWritten }: FileConcentratorParams) {
         this.taskStatusRecords = taskStatusRecord;
-        this.outputPath = outputPath;
-        this.writeStream = fs.createWriteStream(outputPath);
+
+        const ext = getFileExt(outputPath);
+        this.outputFilename = outputPath.slice(0, -ext.length - 1);
+        this.outputFileExt = ext;
         if (deleteAfterWritten) {
             this.deleteAfterWritten = true;
         }
+        this.createNextWriteStream();
+    }
+
+    private async createNextWriteStream(): Promise<void> {
+        return new Promise(async (resolve) => {
+            const createWriteStream = () => {
+                this.writeStream = fs.createWriteStream(
+                    `${this.outputFilename}_${this.writeSequence}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`
+                );
+            };
+            if (this.writeStream) {
+                this.writeStream.end(() => {
+                    createWriteStream();
+                    resolve();
+                });
+            } else {
+                createWriteStream();
+                resolve();
+            }
+        });
     }
 
     private waitStreamWritable(stream: fs.WriteStream): Promise<void> {
@@ -51,7 +78,9 @@ class FileConcentrator {
         const writableTasks: ConcentrationTask[] = [];
         for (let i = this.lastFinishIndex + 1; i <= this.tasks.length; i++) {
             if (!this.tasks[i] && this.taskStatusRecords[i] === TaskStatus.DROPPED) {
-                // 文件未下载 但是任务已经被丢弃 忽略空缺
+                // 文件未下载 但是任务已经被丢弃 忽略空缺 同时分割文件
+                this.writeSequence++;
+                await this.createNextWriteStream();
                 continue;
             }
             if (!this.tasks[i]) {
@@ -97,14 +126,28 @@ class FileConcentrator {
         this.checkWritableTasks();
     }
 
+    /**
+     * 注意：必须在所有任务添加后调用
+     */
     public async waitAllFilesWritten() {
         while (this.isCheckingWritableFiles) {
             await sleep(200);
         }
+        await this.checkWritableTasks();
     }
 
-    public getOutputPath(): string {
-        return this.outputPath;
+    public async closeWriteStream() {
+        return new Promise((resolve) => {
+            this.writeStream.end(resolve);
+        });
+    }
+
+    public getOutputFilePaths(): string[] {
+        const result = [];
+        for (let i = 0; i <= this.writeSequence; i++) {
+            result.push(`${this.outputFilename}_${i}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`);
+        }
+        return result;
     }
 }
 
