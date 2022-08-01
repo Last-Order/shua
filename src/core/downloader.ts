@@ -10,8 +10,8 @@ import TaskScheduler, {
     TaskFailDecision,
     TaskFinishEvent,
 } from "./task_scheduler";
-import { concat, downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
-import { ConsoleLogger, Logger } from "../utils/logger";
+import { downloadFile, getFileExt, loadRemoteFile } from "../utils/file";
+import consoleLogger, { Logger } from "../utils/logger";
 import { DEFAULT_USER_AGENT } from "../constants";
 import { TaskStatus } from "../types";
 import FileConcentrator from "./file_concentrator";
@@ -107,7 +107,11 @@ class Downloader extends EventEmitter {
         logger,
     }: Partial<DownloaderOptions>) {
         super();
-        this.logger = logger || new ConsoleLogger();
+        this.logger = logger || consoleLogger;
+        if (verbose) {
+            this.verbose = verbose;
+            this.logger.enableDebug();
+        }
         if (threads) {
             this.threads = threads;
         }
@@ -151,10 +155,6 @@ class Downloader extends EventEmitter {
                     this.logger.warning("Please use a directory name as the output path.");
                 }
             }
-        }
-        if (verbose) {
-            this.verbose = verbose;
-            this.logger.enableDebug();
         }
         this.setupTaskScheduler();
     }
@@ -287,7 +287,7 @@ class Downloader extends EventEmitter {
                     "UNKNOWN"
                 }]`
             );
-            this.logger.debug(e);
+            // this.logger.debug(e);
             this.emit("task-error", e, task);
         });
         scheduler.on("task-drop", ({ task }: TaskDropEvent<DownloadTask, any>) => {

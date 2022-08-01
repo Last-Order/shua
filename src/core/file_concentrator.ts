@@ -2,6 +2,7 @@ import * as fs from "fs";
 import { TaskStatus } from "../types";
 import { getFileExt } from "../utils/file";
 import { sleep } from "../utils/helper";
+import logger from "../utils/logger";
 
 interface FileConcentratorParams {
     taskStatusRecord: TaskStatus[];
@@ -16,6 +17,10 @@ interface ConcentrationTask {
 
 class FileConcentrator {
     taskStatusRecords: TaskStatus[];
+
+    taskWriteCount: number[] = [0];
+
+    breakpoints: number[] = [];
 
     tasks: ConcentrationTask[] = [];
 
@@ -51,6 +56,7 @@ class FileConcentrator {
                 this.writeStream = fs.createWriteStream(
                     `${this.outputFilename}_${this.writeSequence}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`
                 );
+                logger.debug(`created new writestream, write sequence ${this.writeSequence}.`);
             };
             if (this.writeStream) {
                 this.writeStream.end(() => {
@@ -75,18 +81,20 @@ class FileConcentrator {
             return;
         }
         this.isCheckingWritableFiles = true;
+        logger.debug("check writable tasks start.");
         const writableTasks: ConcentrationTask[] = [];
         for (let i = this.lastFinishIndex + 1; i <= this.tasks.length; i++) {
             if (!this.tasks[i] && this.taskStatusRecords[i] === TaskStatus.DROPPED) {
-                // 文件未下载 但是任务已经被丢弃 忽略空缺 同时分割文件
-                this.writeSequence++;
-                await this.createNextWriteStream();
+                // 文件未下载 但是任务已经被丢弃 忽略空缺 记录文件分割点
+                logger.debug(`create new breakpoint at ${i}`);
+                this.breakpoints.push(i);
                 continue;
             }
             if (!this.tasks[i]) {
                 break;
             }
             writableTasks.push(this.tasks[i]);
+            this.taskWriteCount[this.writeSequence]++;
         }
         if (writableTasks.length > 0) {
             await this.writeFiles(writableTasks);
@@ -96,6 +104,7 @@ class FileConcentrator {
                 }
             }
         }
+        logger.debug("check writable tasks end.");
         this.isCheckingWritableFiles = false;
     }
 
@@ -105,6 +114,11 @@ class FileConcentrator {
             let writable = true;
             let counter = 0;
             for (const task of tasks) {
+                if (this.breakpoints.includes(task.index - 1)) {
+                    logger.debug(`meet write point at ${task.index}.`);
+                    this.writeSequence++;
+                    await this.createNextWriteStream();
+                }
                 writable = this.writeStream.write(fs.readFileSync(task.filePath), () => {
                     counter++;
                     if (counter === tasks.length) {
@@ -134,6 +148,21 @@ class FileConcentrator {
             await sleep(200);
         }
         await this.checkWritableTasks();
+        await this.closeWriteStream();
+        if (this.taskWriteCount[this.writeSequence] === 0) {
+            // 如果最后一个文件为空，则删除
+            fs.unlinkSync(
+                `${this.outputFilename}_${this.writeSequence}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`
+            );
+            this.writeSequence--;
+        }
+        if (this.writeSequence === 0) {
+            // 只输出了一个文件 重命名为原文件名
+            fs.renameSync(
+                `${this.outputFilename}_${this.writeSequence}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`,
+                `${this.outputFilename}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`
+            );
+        }
     }
 
     public async closeWriteStream() {
