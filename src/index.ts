@@ -141,6 +141,11 @@ Erii.addOption({
 });
 
 Erii.addOption({
+    name: ["force-concat"],
+    description: "Force concatenate all downloaded files into a single file",
+});
+
+Erii.addOption({
     name: ["output", "o"],
     description: "Set output direcotry",
     argument: {

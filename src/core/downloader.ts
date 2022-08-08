@@ -30,7 +30,9 @@ export interface DownloaderOptions {
     /** 是否以数字增序重命名文件 */
     ascending: boolean;
     /** 是否二进制连接下载文件 */
-    concat: boolean;
+    concat?: boolean;
+    /** 无视断点强行连接文件 */
+    forceConcat?: boolean;
     /** 是否启用调试输出 */
     verbose?: boolean;
     /** 自定义 Logger */
@@ -67,6 +69,7 @@ class Downloader extends EventEmitter {
     concatOutput: string;
     ascending: boolean = false;
     concat: boolean = false;
+    forceConcat: boolean = false;
     verbose: boolean = false;
 
     // Deps
@@ -102,6 +105,7 @@ class Downloader extends EventEmitter {
         output,
         ascending,
         concat,
+        forceConcat,
         timeout,
         verbose,
         logger,
@@ -142,6 +146,9 @@ class Downloader extends EventEmitter {
         }
         if (concat) {
             this.concat = concat;
+        }
+        if (forceConcat) {
+            this.forceConcat = forceConcat;
         }
         if (output) {
             if (this.concat) {
@@ -367,6 +374,7 @@ class Downloader extends EventEmitter {
                     this.concatOutput || path.resolve(this.output, `_shua_concat_${Date.now()}${ext ? `.${ext}` : ""}`),
                 taskStatusRecord: this.taskStatusRecord,
                 deleteAfterWritten: true,
+                ignoreBreakpoints: this.forceConcat,
             });
         }
 

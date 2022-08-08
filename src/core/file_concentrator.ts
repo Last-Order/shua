@@ -7,7 +7,8 @@ import logger from "../utils/logger";
 interface FileConcentratorParams {
     taskStatusRecord: TaskStatus[];
     outputPath: string;
-    deleteAfterWritten: boolean;
+    deleteAfterWritten?: boolean;
+    ignoreBreakpoints?: boolean;
 }
 
 interface ConcentrationTask {
@@ -38,7 +39,9 @@ class FileConcentrator {
 
     deleteAfterWritten = false;
 
-    constructor({ taskStatusRecord, outputPath, deleteAfterWritten }: FileConcentratorParams) {
+    ignoreBreakpoints = false;
+
+    constructor({ taskStatusRecord, outputPath, deleteAfterWritten, ignoreBreakpoints }: FileConcentratorParams) {
         this.taskStatusRecords = taskStatusRecord;
 
         const ext = getFileExt(outputPath);
@@ -46,6 +49,9 @@ class FileConcentrator {
         this.outputFileExt = ext;
         if (deleteAfterWritten) {
             this.deleteAfterWritten = true;
+        }
+        if (ignoreBreakpoints) {
+            this.ignoreBreakpoints = true;
         }
         this.createNextWriteStream();
     }
@@ -85,9 +91,11 @@ class FileConcentrator {
         const writableTasks: ConcentrationTask[] = [];
         for (let i = this.lastFinishIndex + 1; i <= this.tasks.length; i++) {
             if (!this.tasks[i] && this.taskStatusRecords[i] === TaskStatus.DROPPED) {
-                // 文件未下载 但是任务已经被丢弃 忽略空缺 记录文件分割点
-                logger.debug(`create new breakpoint at ${i}`);
-                this.breakpoints.push(i);
+                if (!this.ignoreBreakpoints) {
+                    // 文件未下载 但是任务已经被丢弃 忽略空缺 记录文件分割点
+                    logger.debug(`create new breakpoint at ${i}`);
+                    this.breakpoints.push(i);
+                }
                 continue;
             }
             if (!this.tasks[i]) {
