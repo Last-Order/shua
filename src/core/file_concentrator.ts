@@ -91,8 +91,12 @@ class FileConcentrator {
         const writableTasks: ConcentrationTask[] = [];
         for (let i = this.lastFinishIndex + 1; i <= this.tasks.length; i++) {
             if (!this.tasks[i] && this.taskStatusRecords[i] === TaskStatus.DROPPED) {
-                if (!this.ignoreBreakpoints) {
+                if (
+                    !this.ignoreBreakpoints &&
+                    (this.writeSequence !== 0 || this.taskWriteCount[this.writeSequence] !== 0)
+                ) {
                     // 文件未下载 但是任务已经被丢弃 忽略空缺 记录文件分割点
+                    // 分割点之前还没有写入过则不分割
                     logger.debug(`create new breakpoint at ${i}`);
                     this.breakpoints.push(i);
                 }
