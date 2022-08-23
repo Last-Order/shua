@@ -185,6 +185,10 @@ class FileConcentrator {
 
     public getOutputFilePaths(): string[] {
         const result = [];
+        if (this.writeSequence === 0) {
+            result.push(`${this.outputFilename}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`);
+            return result;
+        }
         for (let i = 0; i <= this.writeSequence; i++) {
             result.push(`${this.outputFilename}_${i}${this.outputFileExt ? `.${this.outputFileExt}` : ""}`);
         }
